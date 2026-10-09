@@ -80,16 +80,16 @@ jobs:
             exit 1
           fi
 
-      - name: Set build number
+      # Also upgrades the project to the modern Xcode format. The Capacitor
+      # template ships objectVersion 48 / "Xcode 8.0", which current Xcode
+      # refuses to open on a clean checkout ("damaged ... parse error").
+      - name: Set build number and normalise the Xcode project
         run: |
           VERSION_NAME=$(node -p "require('./package.json').version")
+          BUILD_NUMBER="${{ github.run_number }}"
           echo "VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
-          echo "BUILD_NUMBER=${{ github.run_number }}" >> "$GITHUB_ENV"
-          PBX=ios/App/App.xcodeproj/project.pbxproj
-          # MARKETING_VERSION / CURRENT_PROJECT_VERSION lines all share one id (24 hex chars).
-          perl -0pi -e "s/(MARKETING_VERSION = )[^;]+;/\${1}$VERSION_NAME;/g" "$PBX"
-          perl -0pi -e "s/(CURRENT_PROJECT_VERSION = )[^;]+;/\${1}$BUILD_NUMBER;/g" "$PBX"
-          grep -c "MARKETING_VERSION = $VERSION_NAME" "$PBX" || true
+          echo "BUILD_NUMBER=$BUILD_NUMBER" >> "$GITHUB_ENV"
+          node scripts/fix-xcode-project.mjs --version "$VERSION_NAME" "$BUILD_NUMBER"
 
       - name: Decide signing mode
         id: mode
