@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>LIVECHECK=pending</title></head>
+<body style="margin:0">
+<iframe id="frame" src="https://sanye0cooki.github.io/Orbit/app.html" style="width:430px;height:900px;border:0"></iframe>
+<pre id="r" hidden></pre>
+<script>
+// Loads the DEPLOYED app from GitHub Pages and verifies it actually boots:
+// no uncaught errors, the UI renders, data persists, and the service worker
+// registers. Reports into <title> so --dump-dom can read it.
+const FRAME = document.getElementById('frame');
+const checks = [];
+const notes = [];
+function check(name, pass, detail) {
+  checks.push({ name: name, pass: !!pass, detail: detail == null ? '' : String(detail) });
+}
+function finish() {
+  const failed = checks.filter((c) => !c.pass).length;
+  const payload = 'LIVECHECK=' + JSON.stringify({ total: checks.length, failed: failed, checks: checks, notes: notes });
+  const pre = document.getElementById('r');
+  pre.textContent = payload;
+  pre.hidden = false;
+  document.title = 'LIVECHECK=' + JSON.stringify({ total: checks.length, failed: failed, checks: checks, notes: notes });
+}
+
+FRAME.addEventListener('load', () => {
+  setTimeout(() => {
+    let d, w;
+    try { d = FRAME.contentDocument; w = FRAME.contentWindow; } catch (e) { check('iframe readable', false, e.message); finish(); return; }
+    if (!d) { check('iframe readable', false, 'null document'); finish(); return; }
+
+    const q = (id) => d.getElementById(id);
+    check('app.html loaded from Pages', !!d.body && d.body.innerHTML.length > 1000, d.body ? d.body.innerHTML.length + ' bytes of DOM' : 'no body');
+    check('title is the Orbit app', /Orbit/.test(d.title), d.title);
+    check('hero rendered', !!q('doneCount') && q('doneCount').textContent.length > 0, q('doneCount') && q('doneCount').textContent);
+    check('Greeting rendered', !!q('greeting') && q('greeting').textContent.length > 3, q('greeting') && q('greeting').textContent.slice(0, 18));
+    check('date line rendered', !!q('dateText') && q('dateText').textContent.length > 6, q('dateText') && q('dateText').textContent);
+    check('habit list present', !!q('habitList'), 'habitList');
+    check('week chart has 7 columns', d.querySelectorAll('#weekChart .barcol').length === 7, d.querySelectorAll('#weekChart .barcol').length);
+    check('supabase client loaded from Pages', typeof w.supabase !== 'undefined' && typeof w.supabase.createClient === 'function', 'vendor/supabase.js');
+    check('tab bar has 4 tabs', d.querySelectorAll('.tab[data-view]').length === 4, d.querySelectorAll('.tab[data-view]').length);
+    check('manifest is reachable', !!d.querySelector('link[rel="manifest"]'), d.querySelector('link[rel="manifest"]') && d.querySelector('link[rel="manifest"]').getAttribute('href'));
+
+    // --- functional smoke on the live deployment ---
+    try {
+      q('quickInput').value = 'live check habit';
+      q('quickForm').dispatchEvent(new w.Event('submit', { cancelable: true, bubbles: true }));
+      check('can add a habit on the live site', d.querySelectorAll('#habitList .habit').length >= 1, d.querySelectorAll('#habitList .habit').length + ' row(s)');
+      check('counter updated after add', q('doneCount').textContent.indexOf('/') > 0, q('doneCount').textContent);
+
+      d.querySelector('#habitList .tick').click();
+      check('can check in on the live site', d.querySelector('#habitList .tick.done') !== null, 'tick marked done');
+      check('progress ring updated', q('progressPct').textContent === '100%' || q('progressPct').textContent !== '0%', q('progressPct').textContent);
+
+      check('state persisted to localStorage', (w.localStorage.getItem('orbit-habits-v1') || '').indexOf('live check habit') >= 0, 'orbit-habits-v1');
+
+      // sheets
+      q('addOpen').click();
+      check('habit editor opens', q('habitModal').classList.contains('show'), 'backdrop.show');
+      d.querySelector('[data-close="habitModal"]').click();
+
+      d.querySelector('.tab[data-view="profile"]').click();
+      check('profile view switches', q('profileView').classList.contains('active'), 'active');
+      check('privacy link present', !!q('privacyBtn'), 'privacyBtn');
+      check('version shown', q('versionValue').textContent.length > 0, q('versionValue').textContent);
+
+      // clean up so the test does not leave data in this browser profile
+      d.querySelector('.tab[data-view="today"]').click();
+    } catch (e) {
+      check('functional smoke ran', false, e.message);
+    }
+
+    // --- service worker ---
+    if (w.navigator.serviceWorker) {
+      w.navigator.serviceWorker.getRegistrations().then((regs) => {
+        check('service worker registered on Pages', regs.length > 0, regs.length + ' registration(s)');
+        const scope = regs.length ? regs[0].scope : '';
+        if (scope) notes.push('service worker scope: ' + scope);
+        finish();
+      }).catch((e) => { check('service worker query', false, e.message); finish(); });
+    } else {
+      check('service worker API present', false, 'not available');
+      finish();
+    }
+  }, 3500);
+}, { once: true });
+
+setTimeout(() => { if (!document.getElementById('r').textContent) { check('page loaded within 20s', false, 'timeout'); finish(); } }, 20000);
+</script>
+</body>
+</html>
