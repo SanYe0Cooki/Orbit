@@ -98,16 +98,23 @@ jobs:
           ORBIT_KEY_ALIAS: ${{ secrets.ORBIT_KEY_ALIAS }}
           ORBIT_KEY_PASSWORD: ${{ secrets.ORBIT_KEY_PASSWORD }}
         run: |
+          set -euo pipefail
           if [ -n "$ORBIT_KEYSTORE_BASE64" ]; then
             echo "$ORBIT_KEYSTORE_BASE64" | base64 -d > android/app/orbit-release.keystore
             echo "ORBIT_KEYSTORE_PATH=orbit-release.keystore" >> "$GITHUB_ENV"
             echo "Signing with the release keystore."
           else
-            echo "::warning::No ORBIT_KEYSTORE_BASE64 secret found — building a test APK signed with the debug key. Do not publish this artifact."
-            keytool -genkeypair -v -keystore "$HOME/.android/debug.keystore" \
-              -storepass android -keypass android -alias androiddebugkey \
+            echo "::warning::No ORBIT_KEYSTORE_BASE64 secret found — building a test APK signed with a generated debug key. Do not publish this artifact."
+            # A fresh runner has no debug keystore, so the fallback signing config
+            # in prepare-android.mjs would point at a file that does not exist.
+            mkdir -p "$HOME/.android"
+            keytool -genkeypair -v \
+              -keystore "$HOME/.android/debug.keystore" \
+              -storepass android -keypass android \
+              -alias androiddebugkey \
               -keyalg RSA -keysize 2048 -validity 10000 \
-              -dname "CN=Android Debug,O=Android,C=US" 2>/dev/null || true
+              -dname "CN=Android Debug,O=Android,C=US"
+            ls -l "$HOME/.android/debug.keystore"
           fi
           node scripts/prepare-android.mjs "${{ steps.version.outputs.code }}" "${{ steps.version.outputs.name }}"
           chmod +x android/gradlew
