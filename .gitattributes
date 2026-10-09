@@ -1,0 +1,63 @@
+# Keep line endings stable across Windows, macOS and Linux.
+#
+# This repository is developed on Windows (where git's core.autocrlf rewrites
+# text files to CRLF on checkout) and built on GitHub's Linux and macOS runners.
+# Two files in particular must always be LF in the repository:
+#
+#   ios/App/App.xcodeproj/project.pbxproj  — Xcode 26 refuses a CRLF project file
+#                                            and reports it as "damaged ... due to
+#                                            a parse error".
+#   android/gradlew                        — a CRLF shell script fails on Linux
+#                                            with "bad interpreter".
+#
+# `eol=lf` forces LF in the working tree as well, so a Windows checkout cannot
+# corrupt them.
+* text=auto eol=lf
+
+# Shell and build scripts: always LF.
+*.sh      text eol=lf
+gradlew   text eol=lf
+*.mjs     text eol=lf
+*.js      text eol=lf
+*.py      text eol=lf
+*.ps1     text eol=lf
+
+# Xcode project files: always LF (strict parser).
+*.pbxproj         text eol=lf
+*.xcworkspacedata text eol=lf
+*.xcscheme        text eol=lf
+*.xcsettings      text eol=lf
+*.storyboard      text eol=lf
+*.plist           text eol=lf
+*.swift           text eol=lf
+Podfile           text eol=lf
+
+# Android / Gradle: keep .bat CRLF (Windows shells need it) and the rest LF.
+*.bat     text eol=crlf
+*.gradle  text eol=lf
+*.properties text eol=lf
+
+# Web assets.
+*.html        text eol=lf
+*.css         text eol=lf
+*.json        text eol=lf
+*.webmanifest text eol=lf
+*.yml         text eol=lf
+*.md          text eol=lf
+
+# Binary assets: never touch them.
+*.png     binary
+*.jpg     binary
+*.jpeg    binary
+*.gif     binary
+*.webp    binary
+*.ico     binary
+*.pdf     binary
+*.keystore binary
+*.jks     binary
+*.p12     binary
+*.mobileprovision binary
+*.apk     binary
+*.aab     binary
+*.ipa     binary
+*.zip     binary
