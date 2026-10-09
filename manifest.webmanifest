@@ -1,0 +1,20 @@
+{
+  "id": "/wellnest/",
+  "name": "Orbit",
+  "short_name": "Orbit",
+  "description": "Small habits. Better days.",
+  "start_url": "/wellnest/",
+  "scope": "/wellnest/",
+  "display": "standalone",
+  "background_color": "#f6f7f2",
+  "theme_color": "#315b49",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/wellnest/orbit-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
