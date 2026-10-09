@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+.npm/
+
+# Capacitor / native build output
+android/.gradle/
+android/app/build/
+android/build/
+android/app/release/
+android/app/debug/
+ios/App/build/
+ios/App/Pods/
+ios/App/DerivedData/
+ios/App/output/
+ios/App/App/public/
+*.ipa
+*.apk
+*.aab
+*.keystore
+*.jks
+*.p12
+*.mobileprovision
+exportOptions.plist
+
+# Local machine configuration: contains an absolute SDK path, never commit it.
+# Written by Android Studio / `cap sync` on each machine.
+android/local.properties
+android/app/build.gradle.corrupt-backup
+
+# macOS
+.DS_Store
+
+# Logs and local env
+*.log
+.env
+.env.local

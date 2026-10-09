@@ -1,0 +1,54 @@
+{
+  "appId": "com.orbit.habits",
+  "appName": "Orbit",
+  "webDir": ".",
+  "bundledWebRuntime": false,
+  "loggingBehavior": "debug",
+  "backgroundColor": "#f6f7f2",
+  "android": {
+    "path": "android",
+    "allowMixedContent": false,
+    "captureInput": true,
+    "webContentsDebuggingEnabled": false,
+    "adjustMarginsForEdgeToEdge": "auto",
+    "backgroundColor": "#f6f7f2"
+  },
+  "ios": {
+    "path": "ios",
+    "scheme": "Orbit",
+    "contentInset": "always",
+    "limitsNavigationsToAppBoundDomains": false,
+    "backgroundColor": "#f6f7f2"
+  },
+  "server": {
+    "androidScheme": "https",
+    "iosScheme": "capacitor",
+    "hostname": "orbit.local",
+    "allowNavigation": [
+      "sanye0cooki.github.io",
+      "*.supabase.co"
+    ]
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 900,
+      "launchAutoHide": true,
+      "backgroundColor": "#f6f7f2",
+      "androidSplashResourceName": "splash",
+      "showSpinner": false,
+      "androidScaleType": "CENTER_CROP",
+      "splashFullScreen": true,
+      "splashImmersive": true
+    },
+    "StatusBar": {
+      "style": "default",
+      "overlaysWebView": false,
+      "backgroundColor": "#f6f7f2"
+    },
+    "Keyboard": {
+      "resize": "native",
+      "resizeOnFullScreen": true,
+      "style": "default"
+    }
+  }
+}

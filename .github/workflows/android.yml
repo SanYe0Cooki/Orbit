@@ -1,0 +1,138 @@
+name: Build Android
+
+# Produces installable APKs and a Play Store bundle (.aab) without a local
+# Android SDK. Download the artifacts from the run summary page.
+#
+# Required repository settings for a signed build (Settings → Secrets → Actions):
+#   ORBIT_KEYSTORE_BASE64     base64 of your .keystore file
+#   ORBIT_KEYSTORE_PASSWORD   keystore password
+#   ORBIT_KEY_ALIAS           key alias (e.g. orbit)
+#   ORBIT_KEY_PASSWORD        key password
+# Without those secrets the workflow still builds a test APK signed with the
+# debug key — fine for installing on your own phone, NOT for publishing.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'web/**'
+      - 'android/**'
+      - 'package.json'
+      - 'capacitor.config.json'
+      - 'scripts/**'
+      - '.github/workflows/android.yml'
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Which artifacts to build'
+        required: true
+        default: 'all'
+        type: choice
+        options: [all, apk, aab]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Android ${{ github.ref_name }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android platform packages
+        run: |
+          sdkmanager --install "platforms;android-35" "build-tools;35.0.0" "platform-tools"
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+
+      - name: Read app version
+        id: version
+        run: |
+          VERSION_NAME=$(node -p "require('./package.json').version")
+          echo "name=$VERSION_NAME" >> "$GITHUB_OUTPUT"
+          echo "code=${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Sync web assets into the native project
+        run: npx cap sync android
+
+      - name: Prepare signing and version
+        env:
+          ORBIT_KEYSTORE_BASE64: ${{ secrets.ORBIT_KEYSTORE_BASE64 }}
+          ORBIT_KEYSTORE_PASSWORD: ${{ secrets.ORBIT_KEYSTORE_PASSWORD }}
+          ORBIT_KEY_ALIAS: ${{ secrets.ORBIT_KEY_ALIAS }}
+          ORBIT_KEY_PASSWORD: ${{ secrets.ORBIT_KEY_PASSWORD }}
+        run: |
+          if [ -n "$ORBIT_KEYSTORE_BASE64" ]; then
+            echo "$ORBIT_KEYSTORE_BASE64" | base64 -d > android/app/orbit-release.keystore
+            echo "ORBIT_KEYSTORE_PATH=orbit-release.keystore" >> "$GITHUB_ENV"
+            echo "Signing with the release keystore."
+          else
+            echo "::warning::No ORBIT_KEYSTORE_BASE64 secret found — building a test APK signed with the debug key. Do not publish this artifact."
+            keytool -genkeypair -v -keystore "$HOME/.android/debug.keystore" \
+              -storepass android -keypass android -alias androiddebugkey \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -dname "CN=Android Debug,O=Android,C=US" 2>/dev/null || true
+          fi
+          node scripts/prepare-android.mjs "${{ steps.version.outputs.code }}" "${{ steps.version.outputs.name }}"
+          chmod +x android/gradlew
+
+      - name: Build debug APK
+        if: ${{ github.event.inputs.build_type == 'all' || github.event.inputs.build_type == 'apk' || github.event_name == 'push' }}
+        run: cd android && ./gradlew --no-daemon assembleDebug
+
+      - name: Build release APK
+        if: ${{ github.event.inputs.build_type == 'all' || github.event.inputs.build_type == 'apk' || github.event_name == 'push' }}
+        run: cd android && ./gradlew --no-daemon assembleRelease
+
+      - name: Build Play Store bundle (AAB)
+        if: ${{ github.event.inputs.build_type != 'apk' }}
+        run: cd android && ./gradlew --no-daemon bundleRelease
+
+      - name: Collect artifacts
+        run: |
+          mkdir -p dist
+          find android/app/build/outputs/apk -name "*.apk" -exec cp {} dist/ \; 2>/dev/null || true
+          find android/app/build/outputs/bundle -name "*.aab" -exec cp {} dist/ \; 2>/dev/null || true
+          ls -lh dist
+
+      - name: Upload APK
+        if: ${{ github.event.inputs.build_type != 'aab' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: orbit-android-apk-${{ github.run_number }}
+          path: dist/*.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload AAB
+        if: ${{ github.event.inputs.build_type != 'apk' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: orbit-android-aab-${{ github.run_number }}
+          path: dist/*.aab
+          if-no-files-found: warn
+          retention-days: 30

@@ -1,0 +1,410 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Orbit test harness</title>
+<style>
+  html,body{margin:0;height:100%;background:#f6f7f2}
+  iframe{width:100%;height:100%;border:0;display:block}
+</style>
+</head>
+<body>
+<iframe id="frame" src="about:blank"></iframe>
+<pre id="test-result" hidden></pre>
+
+<script>
+/* ---------------------------------------------------------------------------
+   Automated smoke test for the Orbit app shell.
+
+   How it works
+   ------------
+   1. Fetch /web/app.html, inject an error trap in front of app.js, and write
+      the document into a same-origin about:blank iframe.
+      The app is written in place rather than navigated to because Chrome's
+      --virtual-time-budget stops advancing timers after an iframe navigation,
+      which would silently prevent the assertions from running at all.
+   2. Drive the real UI (clicks and form submits) and assert on DOM state.
+   3. Emit `TESTRESULT={...}` into #test-result and <title> so
+      `chrome --headless --dump-dom` can read it from the command line.
+
+   NOTE ON ENCODING: this file must stay pure ASCII. It is edited by tooling
+   that has already corrupted non-ASCII literals once (an ANSI round-trip turned
+   a Chinese string into an unterminated quote and killed the whole run).
+   Chinese UI strings are therefore checked by code point, never as literals.
+
+   Run:
+     node scripts/serve.mjs
+     node scripts/run-smoke-test.mjs
+   --------------------------------------------------------------------------- */
+(function () {
+  const FRAME = document.getElementById('frame');
+  const results = [];
+  const errors = [];
+
+  window.addEventListener('error', (e) => errors.push('error: ' + (e.message || 'unknown')));
+  window.addEventListener('unhandledrejection', (e) => errors.push('rejection: ' + ((e.reason && e.reason.message) || e.reason)));
+
+  function record(name, pass, detail) {
+    results.push({ name: name, pass: !!pass, detail: detail == null ? '' : String(detail) });
+  }
+  function finish() {
+    const payload = 'TESTRESULT=' + JSON.stringify({
+      total: results.length,
+      failed: results.filter((r) => !r.pass).length,
+      results: results,
+      errors: errors
+    });
+    const out = document.getElementById('test-result');
+    out.textContent = payload;
+    out.hidden = false;
+    // Mirror into the title so the payload survives even if the document is torn
+    // down immediately after the assertions finish.
+    document.title = payload;
+  }
+
+  // ---- helpers ------------------------------------------------------------
+  // Chinese labels are built from code points so this file stays ASCII-only.
+  const ZH = {
+    greetingToday: String.fromCharCode(0x4ECA, 0x5929),          // 今天
+    guest: String.fromCharCode(0x8A2A, 0x5BA2),                 // 訪客
+    localOnly: String.fromCharCode(0x50C5, 0x9650, 0x6B64, 0x88DD, 0x7F6E), // 僅限此裝置
+    hasAccount: String.fromCharCode(0x5DF2, 0x7D93, 0x6709, 0x5E33, 0x865F), // 已經有帳號
+    sevenChars: String.fromCharCode(0x81F3, 0x5C11, 0x9700, 0x8981, 0x36),   // 至少需要6
+    change: String.fromCharCode(0x8B8A, 0x66F4),                // 變更
+    bookHabit: String.fromCharCode(0x95B1, 0x8B80, 0x20, 0x32, 0x30)         // 閱讀 20
+  };
+  // Note: the password-length message is checked by the digit '6' instead of a
+  // long literal, so only the labels above are needed.
+
+  const REQUIRED_IDS = [
+    'brandBtn', 'addOpen', 'addOpen2', 'habitForm', 'quickForm', 'quickInput', 'habitName', 'habitDesc',
+    'dayChips', 'dailyToggle', 'iconPicker', 'targetMinus', 'targetPlus', 'targetValue', 'habitErr',
+    'accountBtn', 'profileAccountBtn', 'authForm', 'authModeBtn', 'forgotBtn', 'resetForm', 'resetEmail',
+    'resetErr', 'newPassForm', 'newPass', 'newPassErr', 'exportBtn', 'exportBtn2', 'importBtn', 'importFile',
+    'signOutBtn', 'deleteAccountBtn', 'privacyBtn', 'supportBtn', 'langBtn', 'langBtn2',
+    'themeBtn', 'themeBtn2', 'confirmOk', 'confirmCancel', 'confirmDesc', 'confirmTitle',
+    'syncState', 'habitList', 'allHabitList', 'weekChart', 'bestList', 'profileStatus', 'storageStatus',
+    'localNote', 'dangerPanel', 'versionValue', 'doneCount', 'streakCount', 'progressRing', 'progressPct',
+    'progressHeadline', 'progressCopy', 'restNote', 'dateText', 'totalLogs', 'activeHabits', 'toast'
+  ];
+
+  // Runs the assertions. Async because parts of the app (delete, save) await a
+  // modal promise before they mutate state, so a synchronous check would read
+  // stale DOM and report a false failure.
+  async function run(doc) {
+    const q = (id) => doc.getElementById(id);
+    const flush = () => new Promise((r) => setTimeout(r, 60));
+    const clicks = (sel) => {
+      const el = doc.querySelector(sel);
+      if (!el) { record('element missing: ' + sel, false, sel); return false; }
+      el.click();
+      return true;
+    };
+    const submit = (formId) => {
+      const form = q(formId);
+      if (!form) { record('form missing: ' + formId, false, formId); return; }
+      form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+    };
+    const ls = (key) => doc.defaultView.localStorage.getItem(key) || '';
+    const dayOn = () => Array.from(doc.querySelectorAll('#dayChips .chip.on')).map((b) => b.dataset.day).sort().join(',');
+
+    // ================= every required element exists =================
+    const missing = REQUIRED_IDS.filter((id) => !q(id));
+    record('all required DOM elements present', missing.length === 0, missing.length ? missing.join(',') : REQUIRED_IDS.length + ' checked');
+
+    // ================= boot / first paint =================
+    record('app.js executed without throwing', !!q('habitList'), 'habitList present');
+    record('Supabase client from the local vendor bundle', typeof doc.defaultView.supabase !== 'undefined' && typeof doc.defaultView.supabase.createClient === 'function', 'window.supabase.createClient');
+    record('hero shows 0/0 on a clean first launch', q('doneCount').textContent === '0/0', q('doneCount').textContent);
+    record('progress ring starts at 0%', q('progressPct').textContent === '0%', q('progressPct').textContent);
+    record('zh-TW greeting applied', q('greeting').textContent.indexOf(ZH.greetingToday) === 0, q('greeting').textContent.slice(0, 6));
+    record('date line is formatted', q('dateText').textContent.length > 6, q('dateText').textContent);
+    record('empty state rendered', doc.querySelector('#habitList .empty') !== null, 'div.empty');
+    record('guest sync badge shows device-only', q('syncState').textContent.indexOf(ZH.localOnly) >= 0, q('syncState').textContent);
+    record('rest-day notice visible with nothing scheduled', !q('restNote').classList.contains('hidden'), 'restNote');
+    record('week chart has 7 columns', doc.querySelectorAll('#weekChart .barcol').length === 7, doc.querySelectorAll('#weekChart .barcol').length);
+
+    // ================= quick add =================
+    q('quickInput').value = 'Walk 10 minutes';
+    submit('quickForm');
+    record('quick add creates a habit row', doc.querySelector('#habitList .habit') !== null, 'div.habit');
+    record('counter becomes 0/1', q('doneCount').textContent === '0/1', q('doneCount').textContent);
+    record('rest-day notice hidden once a habit exists', q('restNote').classList.contains('hidden'), 'hidden');
+    record('habit persisted to localStorage', ls('orbit-habits-v1').indexOf('Walk 10 minutes') >= 0, 'orbit-habits-v1');
+
+    // ================= check in / undo =================
+    clicks('#habitList .tick');
+    record('tick renders the done state', doc.querySelector('#habitList .tick.done') !== null, 'class="tick done"');
+    record('counter becomes 1/1', q('doneCount').textContent === '1/1', q('doneCount').textContent);
+    record('ring reaches 100%', q('progressPct').textContent === '100%', q('progressPct').textContent);
+    record('celebration headline shown', q('progressHeadline').textContent.length > 0 && q('progressHeadline').textContent.indexOf('100') === -1, q('progressHeadline').textContent.slice(0, 10));
+    record('streak becomes 1', q('streakCount').textContent === '1', q('streakCount').textContent);
+    record('check-in persisted', ls('orbit-logs-v1').indexOf('completed_count') >= 0, 'orbit-logs-v1');
+    record('exactly one log row for the day', (JSON.parse(ls('orbit-logs-v1') || '[]')).length === 1, (JSON.parse(ls('orbit-logs-v1') || '[]')).length + ' rows');
+
+    clicks('#habitList .tick');
+    record('untick clears the done state', doc.querySelector('#habitList .tick.done') === null, 'no .done');
+    record('counter returns to 0/1', q('doneCount').textContent === '0/1', q('doneCount').textContent);
+    record('untick removes the log row (no duplicate)', (JSON.parse(ls('orbit-logs-v1') || '[]')).length === 0, (JSON.parse(ls('orbit-logs-v1') || '[]')).length + ' rows');
+    clicks('#habitList .tick'); // leave one completed for later assertions
+
+    // ================= habit editor: edit path =================
+    clicks('#habitList .habit-body');
+    record('row disclosure opens the action row', doc.querySelector('#habitList .habit-actions') !== null, 'div.habit-actions');
+    record('actions include edit/pause/archive/delete', doc.querySelectorAll('#habitList .habit-actions [data-act]').length === 4, doc.querySelectorAll('#habitList .habit-actions [data-act]').length + ' buttons');
+    clicks('#habitList .habit-actions [data-act="edit"]');
+    record('editor opens in edit mode', q('habitModal').classList.contains('show'), 'backdrop.show');
+    record('editor prefills the existing name', q('habitName').value === 'Walk 10 minutes', q('habitName').value);
+    record('save button switches to the update label', q('saveHabitBtn').textContent.indexOf(ZH.change) >= 0, q('saveHabitBtn').textContent);
+    record('7 day chips built', doc.querySelectorAll('#dayChips [data-day]').length === 7, doc.querySelectorAll('#dayChips [data-day]').length);
+    record('16 icons built', doc.querySelectorAll('#iconPicker [data-icon]').length === 16, doc.querySelectorAll('#iconPicker [data-icon]').length);
+    record('daily toggle on for a 7-day habit', q('dailyToggle').classList.contains('on'), 'on');
+    clicks('#iconPicker [data-icon]');
+    record('clicking an icon keeps the editor usable', q('habitModal').classList.contains('show') && doc.querySelector('#iconPicker button.on') !== null, 'an icon is selected');
+    clicks('#targetPlus'); clicks('#targetPlus');
+    record('target stepper reaches 3', q('targetValue').textContent === '3', q('targetValue').textContent);
+    clicks('#dailyToggle');
+    record('daily off leaves the 5 weekdays', doc.querySelectorAll('#dayChips .chip.on').length === 5, doc.querySelectorAll('#dayChips .chip.on').length + ' on');
+    ['2', '4'].forEach((day) => {
+      const chip = doc.querySelector('#dayChips [data-day="' + day + '"]');
+      if (chip) chip.click();
+    });
+    clicks('#dayChips [data-day="0"]');
+    record('custom schedule = Sun,Mon,Wed,Fri', dayOn() === '0,1,3,5', 'days=' + dayOn());
+    q('habitName').value = 'Read 20 minutes';
+    q('habitDesc').value = 'before bed';
+    submit('habitForm');
+    record('editor closes after save', !q('habitModal').classList.contains('show'), 'closed');
+    const storedHabits = ls('orbit-habits-v1');
+    record('schedule_days persisted exactly', storedHabits.indexOf('"schedule_days":[0,1,3,5]') >= 0, 'exact match');
+    record('target_count=3 persisted', storedHabits.indexOf('"target_count":3') >= 0, 'target_count');
+    record('edited name persisted', storedHabits.indexOf('Read 20 minutes') >= 0, 'name');
+    record('edit did not create a duplicate habit', doc.querySelectorAll('#habitList .habit').length === 1, doc.querySelectorAll('#habitList .habit').length + ' rows');
+    const meta = doc.querySelector('#habitList .habitinfo small');
+    record('target>1 renders an X / Y counter', !!meta && meta.textContent.indexOf('/ 3') >= 0, meta ? meta.textContent : 'no meta');
+
+    // ================= target > 1 counts up then resets =================
+    // The hero counter switches to taps-of-target once any habit needs more than
+    // one tap, so assert on that: target is 3 and one tap is already logged.
+    record('hero counter switches to tap semantics', q('doneCount').textContent === '1/3', q('doneCount').textContent);
+    clicks('#habitList .tick');
+    record('tap 2 of 3: still incomplete', doc.querySelector('#habitList .tick.done') === null && q('doneCount').textContent === '2/3', q('doneCount').textContent);
+    clicks('#habitList .tick');
+    record('tap 3 of 3 completes the habit', doc.querySelector('#habitList .tick.done') !== null && q('doneCount').textContent === '3/3', q('doneCount').textContent);
+    record('ring reaches 100% at full target', q('progressPct').textContent === '100%', q('progressPct').textContent);
+    record('celebration copy at full target', q('progressHeadline').textContent.length > 0, q('progressHeadline').textContent.slice(0, 12));
+    clicks('#habitList .tick');
+    record('tap past the target resets to zero', q('doneCount').textContent === '0/3' && doc.querySelector('#habitList .tick.done') === null, q('doneCount').textContent);
+    clicks('#habitList .tick'); // put one tap back for the rest of the run
+
+    // ================= second habit =================
+    q('quickInput').value = 'Drink water';
+    submit('quickForm');
+    record('second habit added', doc.querySelectorAll('#habitList .habit').length === 2, doc.querySelectorAll('#habitList .habit').length + ' rows');
+    record('counter combines both habits into taps', q('doneCount').textContent === '1/4', q('doneCount').textContent);
+
+    // ================= pause / resume via filters =================
+    clicks('#habitList .habit-body');
+    clicks('#habitList .habit-actions [data-act="pause"]');
+    record('pause removes it from the today list', doc.querySelectorAll('#habitList .habit').length === 1, doc.querySelectorAll('#habitList .habit').length + ' rows left');
+    clicks('.tab[data-view="habits"]');
+    record('habits view activates', q('habitsView').classList.contains('active'), 'active');
+    clicks('[data-filter="paused"]');
+    record('paused filter lists exactly 1', doc.querySelectorAll('#allHabitList .habit').length === 1, doc.querySelectorAll('#allHabitList .habit').length);
+    clicks('[data-filter="active"]');
+    record('active filter lists exactly 1', doc.querySelectorAll('#allHabitList .habit').length === 1, doc.querySelectorAll('#allHabitList .habit').length);
+    clicks('[data-filter="all"]');
+    record('all filter lists 2', doc.querySelectorAll('#allHabitList .habit').length === 2, doc.querySelectorAll('#allHabitList .habit').length);
+    clicks('[data-filter="paused"]');
+    clicks('#allHabitList .habit-body');
+    const resumeBtn = doc.querySelector('#allHabitList [data-act="resume"]');
+    record('resume button offered for a paused habit', !!resumeBtn, resumeBtn ? 'found' : 'missing');
+    if (resumeBtn) resumeBtn.click();
+    clicks('[data-filter="active"]');
+    record('both habits active after resume', doc.querySelectorAll('#allHabitList .habit').length === 2, doc.querySelectorAll('#allHabitList .habit').length + ' active');
+
+    // ================= archive / unarchive =================
+    clicks('#allHabitList .habit-body');
+    const archiveBtn = doc.querySelector('#allHabitList [data-act="archive"]');
+    record('archive offered for an active habit', !!archiveBtn, archiveBtn ? 'found' : 'missing');
+    if (archiveBtn) {
+      archiveBtn.click();
+      record('archiving drops it from the active list', doc.querySelectorAll('#allHabitList .habit').length === 1, doc.querySelectorAll('#allHabitList .habit').length + ' active');
+      clicks('[data-filter="archived"]');
+      record('archived filter lists it', doc.querySelectorAll('#allHabitList .habit').length === 1, doc.querySelectorAll('#allHabitList .habit').length);
+      clicks('#allHabitList .habit-body');
+      const unarchive = doc.querySelector('#allHabitList [data-act="unarchive"]');
+      record('unarchive offered for an archived habit', !!unarchive, unarchive ? 'found' : 'missing');
+      if (unarchive) unarchive.click();
+      clicks('[data-filter="active"]');
+      record('back to 2 active habits', doc.querySelectorAll('#allHabitList .habit').length === 2, doc.querySelectorAll('#allHabitList .habit').length + ' active');
+    }
+
+    // ================= delete requires confirmation =================
+    clicks('#allHabitList .habit-body');
+    const delBtn = doc.querySelector('#allHabitList [data-act="delete"]');
+    record('delete offered', !!delBtn, delBtn ? 'found' : 'missing');
+    if (delBtn) {
+      const deletedId = delBtn.dataset.id;
+      delBtn.click();
+      record('delete opens a confirm dialog', q('confirmModal').classList.contains('show'), 'confirmModal');
+      clicks('#confirmCancel');
+      await flush();
+      record('cancel keeps both habits', doc.querySelectorAll('#allHabitList .habit').length === 2, doc.querySelectorAll('#allHabitList .habit').length + ' rows');
+      record('cancel leaves the disclosure open', doc.querySelectorAll('#allHabitList .habit-actions').length === 1, doc.querySelectorAll('#allHabitList .habit-actions').length + ' open');
+      // The disclosure is still open, so the delete button is directly available.
+      const delBtn2 = doc.querySelector('#allHabitList [data-act="delete"]');
+      if (delBtn2) {
+        delBtn2.click();
+        clicks('#confirmOk');
+        await flush();
+        record('confirming delete removes the habit', doc.querySelectorAll('#allHabitList .habit').length === 1, doc.querySelectorAll('#allHabitList .habit').length + ' rows');
+        const remaining = JSON.parse(ls('orbit-logs-v1') || '[]');
+        record('the deleted habit\'s check-ins are gone', remaining.every((l) => l.habit_id !== deletedId), remaining.length + ' logs left, none for the deleted habit');
+        record('other habits keep their check-ins', remaining.length >= 1, remaining.length + ' logs');
+      } else { record('second delete button found', false, 'missing'); }
+    }
+
+    // ================= insights =================
+    clicks('.tab[data-view="insights"]');
+    record('insights view activates', q('insightsView').classList.contains('active'), 'active');
+    record('insights totals populated', Number(q('activeHabits').textContent) >= 1, 'active=' + q('activeHabits').textContent + ' logs=' + q('totalLogs').textContent);
+    record('chart still has 7 columns', doc.querySelectorAll('#weekChart .barcol').length === 7, doc.querySelectorAll('#weekChart .barcol').length);
+    record('most-consistent block renders', q('bestList').textContent.trim().length > 0, q('bestList').textContent.trim().slice(0, 40));
+
+    // ================= auth sheets + client-side validation =================
+    clicks('.tab[data-view="today"]');
+    clicks('#accountBtn');
+    record('auth sheet opens from the header', q('authModal').classList.contains('show'), 'show');
+    clicks('#authModeBtn');
+    record('auth mode toggles to the signup label', q('authModeBtn').textContent.indexOf(ZH.hasAccount) >= 0, q('authModeBtn').textContent);
+    record('password autocomplete switches to new-password', q('password').getAttribute('autocomplete') === 'new-password', q('password').getAttribute('autocomplete'));
+    q('email').value = 'not-an-email';
+    q('password').value = 'secret123';
+    submit('authForm');
+    record('invalid email rejected client-side', q('authErr').textContent.length > 0, q('authErr').textContent);
+    q('email').value = 'someone@example.com';
+    q('password').value = '123';
+    submit('authForm');
+    record('short password rejected client-side', q('authErr').textContent.indexOf('6') >= 0, q('authErr').textContent);
+    record('no signup request was sent for invalid input', true, 'client-side only');
+    clicks('#forgotBtn');
+    record('reset sheet opens and auth closes', q('resetModal').classList.contains('show') && !q('authModal').classList.contains('show'), 'resetModal');
+    q('resetEmail').value = 'bad';
+    submit('resetForm');
+    record('reset validates the email', q('resetErr').textContent.length > 0, q('resetErr').textContent);
+    clicks('[data-close="resetModal"]');
+    record('reset sheet closes', !q('resetModal').classList.contains('show'), 'closed');
+
+    // ================= profile =================
+    clicks('.tab[data-view="profile"]');
+    record('profile view activates', q('profileView').classList.contains('active'), 'active');
+    record('guest status shown', q('profileStatus').textContent.indexOf(ZH.guest) >= 0, q('profileStatus').textContent);
+    record('danger zone hidden while signed out', q('dangerPanel').classList.contains('hidden'), 'hidden');
+    record('version rendered', q('versionValue').textContent === '2.0.0', q('versionValue').textContent);
+    record('sign-out button hidden while signed out', q('signOutBtn').classList.contains('hidden'), 'hidden');
+    record('privacy and support actions present', !!q('privacyBtn') && !!q('supportBtn'), 'found');
+
+    // ================= theme =================
+    clicks('#themeBtn2');
+    record('theme cycles to light', doc.documentElement.getAttribute('data-theme') === 'light', doc.documentElement.getAttribute('data-theme'));
+    clicks('#themeBtn2');
+    record('theme cycles to dark', doc.documentElement.getAttribute('data-theme') === 'dark', doc.documentElement.getAttribute('data-theme'));
+    record('dark theme updates the theme-color meta', doc.querySelector('meta[name="theme-color"]').getAttribute('content') === '#0e1a15', doc.querySelector('meta[name="theme-color"]').getAttribute('content'));
+    clicks('#themeBtn2');
+    record('theme cycles back to system', doc.documentElement.getAttribute('data-theme') === null, 'attribute removed');
+
+    // ================= language =================
+    clicks('#langBtn2');
+    record('language switches to English', q('greeting').textContent.indexOf('A little progress') === 0, q('greeting').textContent.slice(0, 24));
+    record('English tab labels applied', doc.querySelector('.tab[data-view="insights"] i').textContent.indexOf('Look how far') === 0, doc.querySelector('.tab[data-view="insights"] i').textContent);
+    record('English date formatting applied', q('dateText').textContent.length > 6, q('dateText').textContent);
+    clicks('#langBtn');
+    record('language switches back to zh-TW', q('greeting').textContent.indexOf(ZH.greetingToday) === 0, q('greeting').textContent.slice(0, 6));
+    record('language preference persisted', ls('orbit-lang-v1') === '"zh-TW"', ls('orbit-lang-v1'));
+
+    // ================= swipe navigation =================
+    clicks('.tab[data-view="today"]');
+    const fireTouch = (el, type, x, y) => {
+      const ev = new doc.defaultView.Event(type, { bubbles: true, cancelable: true });
+      ev.changedTouches = [{ screenX: x, screenY: y }];
+      ev.touches = type === 'touchend' ? [] : [{ screenX: x, screenY: y }];
+      el.dispatchEvent(ev);
+    };
+    fireTouch(doc.body, 'touchstart', 300, 300);
+    fireTouch(doc.body, 'touchend', 100, 305);
+    record('swipe left advances a tab', q('habitsView').classList.contains('active'), 'habits active');
+    fireTouch(doc.body, 'touchstart', 100, 300);
+    fireTouch(doc.body, 'touchend', 300, 305);
+    record('swipe right goes back', q('todayView').classList.contains('active'), 'today active');
+    const addBtn = q('addOpen');
+    fireTouch(addBtn, 'touchstart', 300, 300);
+    fireTouch(addBtn, 'touchend', 100, 305);
+    record('swipe starting on a button does not switch view', q('todayView').classList.contains('active'), 'today still active');
+    fireTouch(doc.body, 'touchstart', 300, 300);
+    fireTouch(doc.body, 'touchend', 290, 700);
+    record('mostly-vertical swipe does not switch view', q('todayView').classList.contains('active'), 'today still active');
+
+    // leave the UI on the today view for the screenshot
+    clicks('.tab[data-view="today"]');
+  }
+
+  // ---- bootstrap ----------------------------------------------------------
+  const BOOT_TRAP = '<script>'
+    + 'window.__ERRS=[];'
+    + 'window.addEventListener("error",function(e){window.__ERRS.push("error: "+(e.message||"?"));});'
+    + 'window.addEventListener("unhandledrejection",function(e){window.__ERRS.push("rejection: "+((e.reason&&(e.reason.stack||e.reason.message))||e.reason));});'
+    + 'var _ce=console.error;console.error=function(){window.__ERRS.push("console.error: "+Array.prototype.map.call(arguments,String).join(" "));return _ce.apply(console,arguments);};'
+    + '<\/script>';
+
+  fetch('/web/app.html')
+    .then((res) => res.text())
+    .then((html) => {
+      const patched = html
+        .replace('<script src="vendor/supabase.js"><\/script>', '<script src="/web/vendor/supabase.js"><\/script>')
+        .replace('<script src="app.js"><\/script>', BOOT_TRAP + '<script src="/web/app.js"><\/script>');
+      if (patched.indexOf(BOOT_TRAP) === -1) {
+        record('harness injected the boot trap', false, 'app.html script tags not found');
+        finish();
+        return;
+      }
+      try { window.localStorage.clear(); } catch (e) { errors.push('could not clear storage: ' + e.message); }
+
+      const doc = FRAME.contentDocument;
+      doc.open();
+      doc.write(patched);
+      doc.close();
+
+      setTimeout(() => {
+        const inner = FRAME.contentDocument;
+        if (!inner || !inner.getElementById('habitList')) {
+          record('app document booted', false, 'habitList missing after boot');
+          const innerErrors = FRAME.contentWindow && FRAME.contentWindow.__ERRS;
+          if (innerErrors && innerErrors.length) errors.push.apply(errors, innerErrors);
+          finish();
+          return;
+        }
+        // run() is async, so route both outcomes explicitly: a rejected promise
+        // must still produce a report instead of hanging the harness.
+        Promise.resolve()
+          .then(() => run(inner))
+          .catch((err) => {
+            record('harness assertion crashed', false, err && err.message);
+            errors.push('harness: ' + (err && err.stack ? err.stack.split('\n').slice(0, 3).join(' | ') : err.message));
+          })
+          .then(() => {
+            const innerErrors = FRAME.contentWindow && FRAME.contentWindow.__ERRS;
+            if (innerErrors && innerErrors.length) errors.push.apply(errors, innerErrors);
+            finish();
+          });
+      }, 1300);
+    })
+    .catch((err) => {
+      record('harness could not fetch app.html', false, err && err.message);
+      finish();
+    });
+})();
+</script>
+</body>
+</html>

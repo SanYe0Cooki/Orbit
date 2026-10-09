@@ -1,0 +1,474 @@
+<!doctype html>
+<html lang="zh-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#f6f7f2">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Orbit">
+<meta name="format-detection" content="telephone=no">
+<meta name="color-scheme" content="light dark">
+<meta name="description" content="Orbit — 一天一點點，把想做的事變成習慣。">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="orbit-icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<title>Orbit — 每天一點點</title>
+<style>
+/* ============================================================
+   Orbit — design tokens
+   ============================================================ */
+:root{
+  color-scheme:light;
+  --ink:#20352d; --muted:#748078; --green:#315b49; --green-ink:#fff;
+  --mint:#e6eee5; --paper:#f6f7f2; --line:#e1e7de; --line-soft:#edf0eb;
+  --white:#fff; --card:#fff; --field:#fff; --coral:#e9a58b;
+  --shadow:0 14px 42px #20352d12; --shadow-lg:0 22px 60px #12231b2e;
+  --danger:#b4472f; --danger-bg:#fdeee9;
+  --radius:24px; --radius-sm:17px; --tap:44px;
+  --sat:env(safe-area-inset-top,0px); --sab:env(safe-area-inset-bottom,0px);
+  --tabbar-h:64px;
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --ink:#e8efe9; --muted:#9aa8a0; --green:#8fc4a6; --green-ink:#0f1d17;
+  --mint:#1e2f27; --paper:#0e1a15; --line:#27392f; --line-soft:#1d2c25;
+  --white:#16241d; --card:#16241d; --field:#1b2a23; --coral:#e0a58c;
+  --shadow:0 14px 42px #00000038; --shadow-lg:0 22px 60px #00000066;
+  --danger:#f0a48d; --danger-bg:#3a201a;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --ink:#e8efe9; --muted:#9aa8a0; --green:#8fc4a6; --green-ink:#0f1d17;
+    --mint:#1e2f27; --paper:#0e1a15; --line:#27392f; --line-soft:#1d2c25;
+    --white:#16241d; --card:#16241d; --field:#1b2a23; --coral:#e0a58c;
+    --shadow:0 14px 42px #00000038; --shadow-lg:0 22px 60px #00000066;
+    --danger:#f0a48d; --danger-bg:#3a201a;
+  }
+}
+
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0; background:var(--paper); color:var(--ink);
+  font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC",system-ui,sans-serif;
+  line-height:1.5; -webkit-font-smoothing:antialiased;
+  overscroll-behavior-y:none;
+}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+input,select,textarea{-webkit-appearance:none;appearance:none}
+/* never let a native app feel like a web page */
+*{-webkit-touch-callout:none}
+input,textarea{-webkit-user-select:text;user-select:text}
+.app{max-width:720px;margin:0 auto;padding:calc(var(--sat) + 10px) 16px calc(var(--tabbar-h) + var(--sab) + 34px)}
+
+/* ---------- header ---------- */
+.top{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 2px 12px;position:sticky;top:0;z-index:5;background:linear-gradient(var(--paper) 68%,transparent)}
+.brand{display:flex;align-items:center;gap:9px;font-weight:800;font-size:19px;letter-spacing:-.6px;background:none;border:0;padding:0;color:var(--ink)}
+.mark{display:grid;place-items:center;width:34px;height:34px;border-radius:12px;background:var(--green);color:var(--green-ink);font-size:17px}
+.topright{display:flex;align-items:center;gap:8px;min-width:0}
+.syncbadge{font-size:11px;color:var(--green);background:var(--mint);border-radius:99px;padding:6px 10px;white-space:nowrap;max-width:37vw;overflow:hidden;text-overflow:ellipsis}
+.syncbadge.warn{color:var(--danger);background:var(--danger-bg)}
+.syncbadge.busy{opacity:.65}
+/* The account button shows the signed-in email, so it must be able to shrink. */
+#accountBtn{max-width:34vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:8px 13px;font-size:13px}
+@media (max-width:430px){
+  .top{gap:6px}
+  .topright{gap:6px}
+  .syncbadge{display:none}
+  #accountBtn{max-width:40vw}
+}
+
+/* ---------- buttons ---------- */
+.pill,.btn{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:10px 14px;color:var(--ink);min-height:40px;transition:transform .14s ease,opacity .14s ease,background .18s}
+.pill{padding:8px 12px;font-size:13px}
+.btn.primary{background:var(--green);border-color:var(--green);color:var(--green-ink);font-weight:750}
+.btn.ghost{background:transparent}
+.btn.danger{color:var(--danger);border-color:var(--danger)}
+.btn:active{transform:scale(.97)}
+.btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+.iconbtn{width:var(--tap);height:var(--tap);min-height:var(--tap);border-radius:14px;border:1px solid transparent;background:transparent;display:grid;place-items:center;font-size:17px;color:var(--muted)}
+.iconbtn:active{background:var(--mint)}
+.smalllink{border:0;background:transparent;color:var(--green);text-decoration:underline;padding:8px;font-size:13px;min-height:var(--tap)}
+.hidden{display:none!important}
+
+/* ---------- views ---------- */
+.view{display:none}
+.view.active{display:block;animation:viewin .26s cubic-bezier(.2,.8,.25,1)}
+@keyframes viewin{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.eyebrow{color:var(--green);font-size:11px;font-weight:800;letter-spacing:1.4px;text-transform:uppercase}
+.hero{padding:16px 2px 20px}
+.hero h1{font-size:clamp(27px,7.6vw,38px);letter-spacing:-1.4px;line-height:1.1;margin:8px 0 6px}
+h1.sectiontitle{font-size:clamp(25px,7vw,34px);letter-spacing:-1.2px;margin:8px 0 5px}
+.sub{color:var(--muted);margin:0;font-size:14.5px}
+.summary{display:flex;gap:9px;margin-top:18px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:12px 15px;flex:1;min-width:0}
+.stat strong{font-size:21px;display:block;letter-spacing:-.8px}
+.stat span{font-size:11px;color:var(--muted)}
+
+/* ---------- panels ---------- */
+.panel{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:18px;min-width:0}
+.panel+.panel,.panel+.summary,.summary+.panel{margin-top:14px}
+.panelhead{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px}
+.panelhead h2{margin:0}
+h2{font-size:17.5px;letter-spacing:-.4px;margin:0 0 4px}
+.muted{color:var(--muted);font-size:12.5px}
+.notice{margin-top:14px;font-size:12px;color:var(--muted);line-height:1.55}
+
+/* ---------- habit rows ---------- */
+.habitlist{display:grid;gap:9px}
+.habit{display:flex;align-items:center;gap:12px;border:1px solid var(--line-soft);border-radius:var(--radius-sm);padding:11px 12px;background:var(--card);transition:transform .16s ease,background .16s}
+.habit:active{transform:scale(.988)}
+.habit.done{background:color-mix(in srgb,var(--mint) 55%,var(--card))}
+.habit.open{border-color:var(--green);border-radius:var(--radius-sm) var(--radius-sm) 0 0;border-bottom-color:transparent}
+.habit.paused{opacity:.6}
+.habit-body{flex:1;min-width:0;background:none;border:0;text-align:left;padding:2px 0;color:inherit;display:block}
+.habitinfo strong{display:block;overflow-wrap:anywhere;font-size:15px;font-weight:650}
+.habitinfo small{color:var(--muted);font-size:11.5px;display:block;overflow-wrap:anywhere}
+.iconbox{width:40px;height:40px;border-radius:13px;background:var(--mint);display:grid;place-items:center;font-size:19px;flex-shrink:0}
+.tick{width:42px;height:42px;border-radius:14px;border:1.5px solid var(--line);background:var(--field);color:transparent;font-size:18px;flex-shrink:0;transition:transform .16s ease,background .18s,border-color .18s}
+.tick:active{transform:scale(.9)}
+.tick.done{background:var(--green);border-color:var(--green);color:var(--green-ink)}
+.habit-actions{display:grid;gap:8px;padding:10px 12px 12px;border:1px solid var(--green);border-top:1px dashed var(--line);border-radius:0 0 var(--radius-sm) var(--radius-sm);margin-top:-9px;background:var(--card)}
+.habit-actions .row{display:flex;gap:7px;flex-wrap:wrap}
+.habit-actions .btn{font-size:12.5px;padding:8px 12px;min-height:38px}
+.empty{border:1px dashed var(--line);border-radius:var(--radius-sm);text-align:center;padding:28px 18px;color:var(--muted);font-size:13px}
+.empty b{display:block;color:var(--ink);margin-bottom:6px;font-size:15px}
+.skelt{height:52px;border-radius:var(--radius-sm);background:linear-gradient(90deg,var(--line-soft),var(--mint),var(--line-soft));background-size:200% 100%;animation:sk 1.3s linear infinite}
+@keyframes sk{from{background-position:200% 0}to{background-position:-200% 0}}
+
+/* ---------- progress ring ---------- */
+.ringwrap{display:flex;align-items:center;gap:16px}
+.ring{width:88px;height:88px;border-radius:50%;display:grid;place-items:center;background:conic-gradient(var(--green) var(--pct,0%),var(--line-soft) 0);position:relative;flex-shrink:0;transition:background .5s ease}
+.ring::before{content:"";position:absolute;inset:8px;background:var(--card);border-radius:50%}
+.ring strong{position:relative;font-size:19px;letter-spacing:-.5px}
+.streak{background:var(--mint);border-radius:var(--radius-sm);padding:14px;margin-top:14px}
+.streak strong{font-size:16px;display:block;font-weight:650}
+.quickadd{display:flex;gap:8px;margin-top:12px}
+.quickadd input{flex:1}
+input,select,textarea{width:100%;min-width:0;border:1px solid var(--line);border-radius:13px;padding:12px;background:var(--field);color:var(--ink);font-size:15px}
+input:focus,select:focus,textarea:focus{outline:2px solid color-mix(in srgb,var(--green) 55%,transparent);outline-offset:0;border-color:var(--green)}
+.quickadd .btn{flex-shrink:0;width:48px;padding:0;font-size:19px;min-height:46px}
+
+/* ---------- chart ---------- */
+.chart{display:flex;align-items:flex-end;gap:8px;height:158px;padding:14px 2px 0}
+.barcol{flex:1;display:flex;flex-direction:column;align-items:center;height:100%;gap:6px}
+.bar{flex:1;width:100%;display:flex;align-items:flex-end;background:var(--line-soft);border-radius:9px;overflow:hidden;min-height:8px}
+.bar i{display:block;width:100%;min-height:4px;background:linear-gradient(180deg,var(--green),color-mix(in srgb,var(--green) 62%,var(--mint)));border-radius:9px;transition:height .5s cubic-bezier(.2,.8,.25,1)}
+.barcol b{font-size:11px}
+.barcol span{font-size:10.5px;color:var(--muted)}
+.barcol.today b{color:var(--green)}
+
+/* ---------- settings rows ---------- */
+.profileline{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:13px 0;border-bottom:1px solid var(--line);min-height:var(--tap)}
+.profileline:last-of-type{border-bottom:0}
+.profileline .val{color:var(--muted);font-size:13px;text-align:right;overflow-wrap:anywhere}
+.btnrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.btnrow .btn{flex:1;min-width:130px}
+
+/* ---------- tab bar ---------- */
+.tabs{position:fixed;z-index:6;bottom:0;left:0;right:0;background:color-mix(in srgb,var(--card) 88%,transparent);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border-top:1px solid var(--line);padding:7px 10px calc(7px + var(--sab));display:flex;justify-content:center;gap:6px}
+.tab{border:0;background:transparent;color:var(--muted);border-radius:15px;padding:7px 10px;flex:1;max-width:130px;font-size:11px;min-height:52px;transition:background .18s,color .18s}
+.tab span{display:block;font-size:19px;line-height:1.15;margin-bottom:2px}
+.tab.active{background:var(--mint);color:var(--green);font-weight:800}
+.tab:active{transform:scale(.95)}
+
+/* ---------- toast ---------- */
+.toast{position:fixed;top:calc(var(--sat) + 12px);left:50%;transform:translate(-50%,-24px);opacity:0;pointer-events:none;background:var(--ink);color:var(--paper);padding:11px 16px;border-radius:14px;z-index:20;transition:opacity .22s,transform .22s;max-width:88vw;font-size:13px;text-align:center;box-shadow:var(--shadow-lg)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+/* ---------- sheets & modals ---------- */
+.backdrop{position:fixed;inset:0;background:#0b1a13b8;backdrop-filter:blur(3px);z-index:10;display:none;align-items:flex-end;justify-content:center;padding:0}
+.backdrop.show{display:flex}
+@media (min-width:640px){.backdrop{align-items:center;padding:18px}}
+.modal{background:var(--card);border-radius:26px 26px 0 0;padding:22px 20px calc(22px + var(--sab));width:100%;max-width:520px;box-shadow:var(--shadow-lg);position:relative;max-height:92dvh;overflow-y:auto;-webkit-overflow-scrolling:touch;animation:sheetup .3s cubic-bezier(.2,.85,.25,1)}
+@media (min-width:640px){.modal{border-radius:26px;padding-bottom:24px}}
+@keyframes sheetup{from{transform:translateY(34px);opacity:.4}to{transform:none;opacity:1}}
+.modal h2{margin:0 42px 6px 0;letter-spacing:-.6px;font-size:21px}
+.modal p{color:var(--muted);font-size:13px;margin:0 0 4px}
+.x{position:absolute;right:14px;top:14px;border:0;border-radius:50%;background:var(--mint);color:var(--ink);width:34px;height:34px;font-size:19px;line-height:1}
+.field{display:grid;gap:6px;margin:13px 0}
+.field label{font-size:12px;font-weight:750}
+.field .hint{font-size:11px;color:var(--muted)}
+.modal .btn{width:100%;margin-top:10px;min-height:47px}
+.split{display:flex;gap:8px}
+.split .btn{flex:1}
+.divider{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:12px;margin:14px 0}
+.divider::before,.divider::after{content:"";height:1px;background:var(--line);flex:1}
+.chips{display:flex;gap:7px;flex-wrap:wrap;margin-top:6px}
+.chip{border:1px solid var(--line);background:var(--field);border-radius:12px;padding:9px 12px;font-size:13px;min-height:40px}
+.chip.on{background:var(--green);border-color:var(--green);color:var(--green-ink);font-weight:750}
+.icons{display:grid;grid-template-columns:repeat(8,1fr);gap:6px}
+@media (max-width:420px){.icons{grid-template-columns:repeat(6,1fr)}}
+.icons button{aspect-ratio:1;border:1px solid var(--line);background:var(--field);border-radius:12px;font-size:17px;display:grid;place-items:center;padding:0}
+.icons button.on{border-color:var(--green);background:var(--mint)}
+.grab{width:38px;height:4px;border-radius:99px;background:var(--line);margin:-8px auto 12px}
+.err{color:var(--danger);font-size:12.5px;min-height:17px;margin-top:8px}
+.stepper{display:flex;align-items:center;gap:12px}
+.stepper button{width:42px;height:42px;border-radius:13px;border:1px solid var(--line);background:var(--field);font-size:19px}
+.stepper b{font-size:17px;min-width:26px;text-align:center}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <button class="brand" id="brandBtn" aria-label="回到今日"><span class="mark">◌</span> Orbit</button>
+    <div class="topright">
+      <span class="syncbadge" id="syncState">● 僅限此裝置</span>
+      <button class="pill" id="themeBtn" aria-label="切換深色模式">◐</button>
+      <button class="pill" id="langBtn">EN</button>
+      <button class="btn primary" id="accountBtn">登入 / 同步</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- ==================== TODAY ==================== -->
+    <section class="view active" id="todayView">
+      <div class="hero">
+        <div class="eyebrow" id="eyebrow">A LITTLE BETTER, EVERY DAY</div>
+        <h1 id="greeting">今天，慢慢來也很好。</h1>
+        <p class="sub" id="dateText"></p>
+        <div class="summary">
+          <div class="stat"><strong id="doneCount">0/0</strong><span id="todayLabel">今日完成</span></div>
+          <div class="stat"><strong id="streakCount">0</strong><span id="streakLabel">連續天數</span></div>
+        </div>
+      </div>
+      <div class="layout">
+        <section class="panel">
+          <div class="panelhead">
+            <div><h2 id="todayHabits">今日習慣</h2><div class="muted" id="gentle">不求完美，只求持續。</div></div>
+            <button class="btn primary" id="addOpen">＋ <span id="addText">新增</span></button>
+          </div>
+          <div class="habitlist" id="habitList"></div>
+          <div class="notice hidden" id="restNote"></div>
+          <div class="notice" id="localNote">訪客模式的資料只會儲存在這台裝置。</div>
+        </section>
+        <div class="side">
+          <section class="panel">
+            <div class="panelhead"><h2 id="progressTitle">今天的節奏</h2></div>
+            <div class="ringwrap">
+              <div class="ring" id="progressRing"><strong id="progressPct">0%</strong></div>
+              <div><b id="progressHeadline">一步一步來</b><div class="muted" id="progressCopy">完成一件小事，也值得肯定。</div></div>
+            </div>
+            <div class="streak"><div class="muted" id="focusLabel">今日提醒</div><strong id="focusText">先從最簡單的一件事開始。</strong></div>
+          </section>
+          <section class="panel">
+            <h2 id="quickTitle">快速新增</h2>
+            <div class="muted" id="quickCopy">把想養成的小習慣寫下來。</div>
+            <form class="quickadd" id="quickForm" autocomplete="off">
+              <input id="quickInput" maxlength="100" required placeholder="例如：散步 10 分鐘" aria-label="快速新增習慣">
+              <button class="btn primary" type="submit" aria-label="新增">＋</button>
+            </form>
+          </section>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== HABITS ==================== -->
+    <section class="view" id="habitsView">
+      <div class="eyebrow" id="habitsEyebrow">YOUR ROUTINE</div>
+      <h1 class="sectiontitle" id="habitsHeading">我的習慣</h1>
+      <p class="sub" id="habitsSub">小小的重複，會慢慢改變生活。</p>
+      <div class="chips" id="habitFilters" style="margin-top:16px">
+        <button class="chip on" data-filter="active" id="filterActive">進行中</button>
+        <button class="chip" data-filter="paused" id="filterPaused">已暫停</button>
+        <button class="chip" data-filter="archived" id="filterArchived">已封存</button>
+        <button class="chip" data-filter="all" id="filterAll">全部</button>
+      </div>
+      <section class="panel" style="margin-top:14px">
+        <div class="panelhead">
+          <h2 id="allHabits">所有習慣</h2>
+          <button class="btn primary" id="addOpen2">＋ <span id="addText2">新增</span></button>
+        </div>
+        <div class="habitlist" id="allHabitList"></div>
+      </section>
+    </section>
+
+    <!-- ==================== INSIGHTS ==================== -->
+    <section class="view" id="insightsView">
+      <div class="eyebrow" id="insightEyebrow">NOTICE YOUR GROWTH</div>
+      <h1 class="sectiontitle" id="insightHeading">看見自己的進步</h1>
+      <p class="sub" id="insightSub">不需要每天滿分，持續就很了不起。</p>
+      <section class="panel" style="margin-top:18px">
+        <h2 id="weekTitle">近七天的完成紀錄</h2>
+        <div class="chart" id="weekChart"></div>
+      </section>
+      <div class="summary">
+        <div class="stat"><strong id="totalLogs">0</strong><span id="totalLogsLabel">累計完成次數</span></div>
+        <div class="stat"><strong id="activeHabits">0</strong><span id="activeHabitsLabel">進行中的習慣</span></div>
+      </div>
+      <section class="panel">
+        <div class="panelhead"><h2 id="bestTitle">最穩定的習慣</h2></div>
+        <div id="bestList"></div>
+      </section>
+    </section>
+
+    <!-- ==================== PROFILE ==================== -->
+    <section class="view" id="profileView">
+      <div class="eyebrow" id="profileEyebrow">YOUR ORBIT</div>
+      <h1 class="sectiontitle" id="profileHeading">個人設定</h1>
+      <p class="sub" id="profileSub">讓 Orbit 配合你的生活節奏。</p>
+      <section class="panel" style="margin-top:18px">
+        <div class="profileline"><span id="accountStatusLabel">帳號狀態</span><b class="val" id="profileStatus">訪客模式</b></div>
+        <div class="profileline"><span id="languageLabel">介面語言</span><button class="smalllink" id="langBtn2">切換語言</button></div>
+        <div class="profileline"><span id="themeLabel">外觀</span><button class="smalllink" id="themeBtn2">跟隨系統</button></div>
+        <div class="profileline"><span id="dataLabel">資料儲存</span><b class="val" id="storageStatus">本機</b></div>
+        <div class="btnrow">
+          <button class="btn primary" id="profileAccountBtn">登入 / 同步</button>
+          <button class="btn" id="exportBtn">匯出資料</button>
+          <button class="btn" id="importBtn">匯入資料</button>
+          <button class="btn hidden" id="signOutBtn">登出</button>
+        </div>
+        <div class="notice" id="profileNote">登入後，習慣與打卡記錄會同步到你的帳號。</div>
+      </section>
+      <section class="panel">
+        <div class="panelhead"><h2 id="aboutTitle">關於 Orbit</h2></div>
+        <div class="profileline"><span id="versionLabel">版本</span><b class="val" id="versionValue">—</b></div>
+        <div class="profileline"><span id="privacyLabel">隱私政策</span><button class="smalllink" id="privacyBtn">開啟</button></div>
+        <div class="profileline"><span id="supportLabel">問題回報</span><button class="smalllink" id="supportBtn">寄信</button></div>
+        <div class="profileline"><span id="exportLabel2">資料備份</span><button class="smalllink" id="exportBtn2">匯出</button></div>
+        <div class="notice" id="healthNote">Orbit 是一般生活習慣工具，不是醫療服務，也不能取代專業建議。</div>
+      </section>
+      <section class="panel hidden" id="dangerPanel">
+        <div class="panelhead"><h2 id="dangerTitle">帳號與資料</h2></div>
+        <div class="notice" id="dangerNote">刪除帳號會永久移除你的習慣與打卡紀錄，無法復原。</div>
+        <button class="btn danger" id="deleteAccountBtn">刪除我的帳號與資料</button>
+      </section>
+    </section>
+  </main>
+</div>
+
+<nav class="tabs" aria-label="主要導覽">
+  <button class="tab active" data-view="today"><span>☀</span><i id="tabToday">今日</i></button>
+  <button class="tab" data-view="habits"><span>◉</span><i id="tabHabits">習慣</i></button>
+  <button class="tab" data-view="insights"><span>▥</span><i id="tabInsights">統計</i></button>
+  <button class="tab" data-view="profile"><span>☻</span><i id="tabProfile">我的</i></button>
+</nav>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<!-- ==================== habit editor ==================== -->
+<div class="backdrop" id="habitModal">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="habitModalTitle">
+    <div class="grab"></div>
+    <button class="x" data-close="habitModal" aria-label="關閉">×</button>
+    <h2 id="habitModalTitle">新增習慣</h2>
+    <p id="habitModalDesc">從一件簡單、容易做到的小事開始。</p>
+    <form id="habitForm" autocomplete="off">
+      <div class="field">
+        <label id="iconLabel">圖示</label>
+        <div class="icons" id="iconPicker"></div>
+      </div>
+      <div class="field">
+        <label id="habitNameLabel" for="habitName">習慣名稱</label>
+        <input id="habitName" maxlength="100" required placeholder="例如：喝一杯水">
+      </div>
+      <div class="field">
+        <label id="habitDescLabel" for="habitDesc">提醒（選填）</label>
+        <input id="habitDesc" maxlength="1000" placeholder="讓自己更容易記得">
+      </div>
+      <div class="field">
+        <label id="scheduleLabel">重複的日子</label>
+        <div class="chips" id="dayChips"></div>
+        <button type="button" class="chip" id="dailyToggle" style="margin-top:8px" aria-pressed="true">每天</button>
+      </div>
+      <div class="field">
+        <label id="targetLabel">一天幾次</label>
+        <div class="stepper">
+          <button type="button" id="targetMinus" aria-label="減少">−</button>
+          <b id="targetValue">1</b>
+          <button type="button" id="targetPlus" aria-label="增加">＋</button>
+        </div>
+      </div>
+      <div class="err" id="habitErr"></div>
+      <button class="btn primary" type="submit" id="saveHabitBtn">儲存習慣</button>
+    </form>
+  </div>
+</div>
+
+<!-- ==================== auth ==================== -->
+<div class="backdrop" id="authModal">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+    <div class="grab"></div>
+    <button class="x" data-close="authModal" aria-label="關閉">×</button>
+    <h2 id="authTitle">登入 Orbit</h2>
+    <p id="authDesc">用電子郵件註冊或登入，習慣就會在手機與電腦之間同步。</p>
+    <form id="authForm" autocomplete="on">
+      <div class="field">
+        <label id="emailLabel" for="email">電子郵件</label>
+        <input id="email" type="email" inputmode="email" autocomplete="email" autocapitalize="off" spellcheck="false" required placeholder="you@example.com">
+      </div>
+      <div class="field">
+        <label id="passwordLabel" for="password">密碼</label>
+        <input id="password" type="password" autocomplete="current-password" minlength="6" required placeholder="至少 6 個字元">
+        <span class="hint" id="passwordHint">至少 6 個字元</span>
+      </div>
+      <div class="err" id="authErr"></div>
+      <button class="btn primary" type="submit" id="authSubmit">登入 / 建立帳號</button>
+    </form>
+    <button class="smalllink" id="authModeBtn">還沒有帳號？建立帳號</button>
+    <button class="smalllink" id="forgotBtn">忘記密碼</button>
+    <div class="notice" id="authNotice">若需驗證電子郵件，請查看你的收件匣（包含垃圾郵件）。</div>
+  </div>
+</div>
+
+<!-- ==================== forgot password ==================== -->
+<div class="backdrop" id="resetModal">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="resetTitle">
+    <div class="grab"></div>
+    <button class="x" data-close="resetModal" aria-label="關閉">×</button>
+    <h2 id="resetTitle">重設密碼</h2>
+    <p id="resetDesc">輸入註冊用的電子郵件，我們會寄送重設連結給你。</p>
+    <form id="resetForm" autocomplete="on">
+      <div class="field">
+        <label id="resetEmailLabel" for="resetEmail">電子郵件</label>
+        <input id="resetEmail" type="email" inputmode="email" autocomplete="email" required placeholder="you@example.com">
+      </div>
+      <div class="err" id="resetErr"></div>
+      <button class="btn primary" type="submit" id="resetSubmit">寄送重設連結</button>
+    </form>
+  </div>
+</div>
+
+<!-- ==================== new password (after reset link) ==================== -->
+<div class="backdrop" id="newPassModal">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="newPassTitle">
+    <h2 id="newPassTitle">設定新密碼</h2>
+    <p id="newPassDesc">請設定一組新的密碼，至少 6 個字元。</p>
+    <form id="newPassForm" autocomplete="on">
+      <div class="field">
+        <label id="newPassLabel" for="newPass">新密碼</label>
+        <input id="newPass" type="password" autocomplete="new-password" minlength="6" required placeholder="至少 6 個字元">
+      </div>
+      <div class="err" id="newPassErr"></div>
+      <button class="btn primary" type="submit" id="newPassSubmit">更新密碼</button>
+    </form>
+  </div>
+</div>
+
+<!-- ==================== confirm ==================== -->
+<div class="backdrop" id="confirmModal">
+  <div class="modal" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle">
+    <div class="grab"></div>
+    <h2 id="confirmTitle">確定嗎？</h2>
+    <p id="confirmDesc"></p>
+    <div class="split" style="margin-top:14px">
+      <button class="btn ghost" id="confirmCancel">取消</button>
+      <button class="btn danger" id="confirmOk">確定</button>
+    </div>
+  </div>
+</div>
+
+<input type="file" id="importFile" accept="application/json,.json" class="hidden">
+<script src="vendor/supabase.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

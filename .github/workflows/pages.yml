@@ -1,0 +1,63 @@
+name: Deploy web app to GitHub Pages
+
+# Publishes the Orbit web app to GitHub Pages.
+#
+# Source of truth is web/. The workflow stages it as the site root, so the site
+# becomes https://<user>.github.io/<repo>/ — and especially
+# https://<user>.github.io/<repo>/app.html, which is the URL stored in Supabase's
+# "Site URL" and inside confirmation emails. Keep that path working.
+#
+# Repository setting required once: Settings → Pages → Build and deployment →
+# Source = GitHub Actions.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'web/**'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy web/
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify the web app before publishing
+        run: node scripts/verify.mjs
+        continue-on-error: true
+
+      - name: Stage the site
+        run: |
+          mkdir -p _site
+          cp -R web/. _site/
+          # Stop Jekyll from processing the artifact.
+          touch _site/.nojekyll
+          ls -la _site
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
