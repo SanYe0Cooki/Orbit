@@ -65,6 +65,11 @@ jobs:
       - name: Sync web assets into the native project
         run: npx cap sync ios
 
+      # `cap sync` regenerates the Podfile and, when the project was installed
+      # with pnpm, it writes pnpm store paths that do not exist here.
+      - name: Make the Podfile portable
+        run: node scripts/fix-podfile.mjs
+
       - name: Install CocoaPods dependencies
         working-directory: ios/App
         run: |

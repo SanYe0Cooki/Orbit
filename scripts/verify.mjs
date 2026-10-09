@@ -54,6 +54,46 @@ const config = JSON.parse(read('capacitor.config.json'));
 const appId = config.appId;
 check('capacitor.config.json has a non-placeholder appId', !!appId && appId !== 'com.getcapacitor.app', appId);
 
+// webDir must be a real subdirectory: Capacitor rejects "." and "..", and a
+// wrong value only shows up much later as a confusing CI failure.
+check('webDir is a relative subdirectory, not the repo root',
+  typeof config.webDir === 'string' && config.webDir !== '.' && config.webDir !== '..' && !/^([A-Za-z]:|[\\/])/.test(config.webDir),
+  'webDir=' + JSON.stringify(config.webDir));
+check('webDir points at an existing directory that contains app.html',
+  exists(join(config.webDir, 'app.html')), config.webDir + '/app.html');
+check('capacitor.config.json has no trailing commas (strict JSON)',
+  !/,\s*[}\]]/.test(read('capacitor.config.json')), 'parsed as JSON above');
+
+// The iOS Podfile must resolve pods through a plain node_modules layout,
+// otherwise `pod install` works locally with pnpm but fails in CI (npm).
+const podfile = read('ios/App/Podfile');
+check('ios Podfile does not hard-code pnpm store paths',
+  !podfile.includes('.pnpm'), 'pnpm paths only exist on one machine');
+check('ios Podfile references ../../node_modules/@capacitor',
+  podfile.includes("'../../node_modules/@capacitor/ios'"), 'npm-compatible');
+
+// CI actions that are known to be broken on current runner images.
+// Only inspect actual `uses:` statements: the workflow comments mention the
+// retired action on purpose, to explain why it is not used.
+const androidWorkflow = read('.github/workflows/android.yml');
+const androidUsesLines = androidWorkflow
+  .split('\n')
+  .filter((line) => /^\s*-?\s*uses:/.test(line))
+  .join('\n');
+check('android workflow does not use the retired android-actions/setup-android',
+  !/android-actions\/setup-android/.test(androidUsesLines),
+  'it fails trying to install the removed "tools" package');
+check('android workflow installs platforms;android-35',
+  androidWorkflow.includes('platforms;android-35'), 'compileSdk 35');
+check('android workflow points the release build at the signing config',
+  androidWorkflow.includes('prepare-android.mjs'), 'version + signing');
+
+const iosWorkflow = read('.github/workflows/ios.yml');
+check('ios workflow makes the Podfile portable before pod install',
+  /fix-podfile\.mjs/.test(iosWorkflow) &&
+  iosWorkflow.indexOf('fix-podfile.mjs') < iosWorkflow.indexOf('pod install'),
+  'pnpm store paths do not exist in CI');
+
 const androidGradle = read('android/app/build.gradle');
 check('android applicationId matches capacitor appId',
   androidGradle.includes('applicationId "' + appId + '"'), appId);
