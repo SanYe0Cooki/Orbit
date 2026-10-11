@@ -53,7 +53,8 @@ const state = {
   progress: new Map(),
   displayName: '',
   avatar: '',
-  healthDone: { water: false, walk: false, sleep: false }
+  healthDone: { water: false, walk: false, sleep: false },
+  mood: ''
 };
 
 const $ = (id) => document.getElementById(id);
@@ -361,6 +362,39 @@ function dailyHealthTip() {
   return tips[day % tips.length];
 }
 
+/* ------------------------------------------------------------- quotes */
+const QUOTES = {
+  'zh-TW': [
+    '小小的堅持，時間會給你答案。',
+    '進步不是直線，是螺旋。',
+    '今天比昨天好一點，就夠了。',
+    '習慣是你對自己的承諾。',
+    '不用和別人比，和昨天的自己比就好。',
+    '簡單的事重複做，就是不簡單。',
+    '每一次打卡，都是在告訴自己：我說到做到。',
+    '開始比完美重要。',
+    '你不需要很厲害才開始，但你需要開始才會很厲害。',
+    '慢慢来，比较快。'
+  ],
+  'en': [
+    'Small steps every day add up to something big.',
+    'Progress is not a straight line — it is a spiral.',
+    'A little better than yesterday is enough.',
+    'A habit is a promise you keep to yourself.',
+    'Compare yourself to who you were yesterday.',
+    'Simple things done repeatedly become extraordinary.',
+    'Every check-in tells yourself: I follow through.',
+    'Starting matters more than perfecting.',
+    'You do not need to be great to start, but you need to start to be great.',
+    'Slow is smooth, smooth is fast.'
+  ]
+};
+function dailyQuote() {
+  const q = QUOTES[state.lang] || QUOTES['en'];
+  const day = Math.floor(Date.now() / 86400000);
+  return q[day % q.length];
+}
+
 /* ------------------------------------------------------------- avatar / name */
 function applyAvatar() {
   const img = $('avatarImg');
@@ -645,6 +679,19 @@ function render() {
   $('walkBtn').classList.toggle('on', state.healthDone.walk);
   $('sleepBtn').classList.toggle('on', state.healthDone.sleep);
 
+  // daily quote + mood
+  if ($('dailyQuote')) $('dailyQuote').textContent = dailyQuote();
+  if ($('moodRow')) {
+    $('moodRow').querySelectorAll('button').forEach((b) => {
+      b.classList.toggle('on', b.dataset.mood === state.mood);
+    });
+  }
+
+  // habits page stats
+  if ($('hActiveCount')) $('hActiveCount').textContent = String(activeHabits().length);
+  if ($('hDoneToday')) $('hDoneToday').textContent = String(todayHabits().filter((h) => isDone(h.id, todayKey())).length);
+  if ($('hTotalLogs')) $('hTotalLogs').textContent = String(state.logs.filter((l) => (Number(l.completed_count) || 1) > 0).length);
+
   applyStrings();
 }
 
@@ -689,8 +736,8 @@ function applyStrings() {
   $('habitDesc').placeholder = t('habitDescPlaceholder');
   $('email').placeholder = 'you@example.com';
   $('resetEmail').placeholder = 'you@example.com';
-  $('langBtn').textContent = state.lang === 'zh-TW' ? 'EN' : '繁中';
-  $('langBtn2').textContent = state.lang === 'zh-TW' ? '切換為 English' : 'Switch to 繁中';
+  $('langBtn').textContent = state.lang === 'zh-TW' ? '繁中' : (state.lang === 'en' ? 'EN' : stateLangName(state.lang));
+  $('langBtn2').textContent = stateLangName(state.lang);
   $('themeBtn2').textContent = state.theme === 'dark' ? t('themeDark') : (state.theme === 'light' ? t('themeLight') : t('themeSystem'));
   $('themeBtn').textContent = state.theme === 'dark' ? '☀' : '◐';
   $('dailyToggle').textContent = t('daily');
@@ -1285,6 +1332,15 @@ async function importData(file) {
 }
 
 /* ------------------------------------------------------------------ views */
+function showLangModal() {
+  if ($('langList')) {
+    $('langList').querySelectorAll('[data-lang]').forEach((b) => {
+      b.classList.toggle('on', b.dataset.lang === state.lang);
+    });
+  }
+  showModal('langModal');
+}
+
 function switchView(name, animate) {
   document.querySelectorAll('.view').forEach((v) => v.classList.toggle('active', v.id === name + 'View'));
   document.querySelectorAll('.tab').forEach((b) => b.classList.toggle('active', b.dataset.view === name));
@@ -1536,8 +1592,8 @@ function wireEvents() {
     window.location.href = 'mailto:' + CONFIG.supportEmail + '?subject=' + encodeURIComponent('Orbit feedback');
   });
 
-  $('langBtn').addEventListener('click', () => setLang(state.lang === 'zh-TW' ? 'en' : 'zh-TW'));
-  $('langBtn2').addEventListener('click', () => setLang(state.lang === 'zh-TW' ? 'en' : 'zh-TW'));
+  $('langBtn').addEventListener('click', () => showLangModal());
+  $('langBtn2').addEventListener('click', () => showLangModal());
   $('themeBtn').addEventListener('click', cycleTheme);
   $('themeBtn2').addEventListener('click', cycleTheme);
 
@@ -1558,6 +1614,44 @@ function wireEvents() {
       store.set(KEY.health, state.healthDone);
       render();
       toast(state.healthDone[key] ? '✓' : '');
+    });
+  }
+
+  // mood check-in
+  if ($('moodRow')) {
+    $('moodRow').querySelectorAll('button').forEach((b) => {
+      b.addEventListener('click', () => {
+        state.mood = (state.mood === b.dataset.mood) ? '' : b.dataset.mood;
+        store.set('orbit-mood-' + todayKey(), state.mood);
+        render();
+      });
+    });
+  }
+
+  // suggested habit chips
+  if ($('suggestChips')) {
+    $('suggestChips').querySelectorAll('[data-suggest]').forEach((b) => {
+      b.addEventListener('click', () => {
+        const name = b.dataset.suggest;
+        state.habits.unshift({
+          id: newId(), name, description: '', icon: '✦', color: 'sage',
+          schedule_days: [0,1,2,3,4,5,6], target_count: 1, status: 'active',
+          timezone: timezoneName(), created_at: new Date().toISOString(), updated_at: new Date().toISOString()
+        });
+        persist(); render();
+        toast(t('saved'));
+        scheduleSync(300);
+      });
+    });
+  }
+
+  // language picker
+  if ($('langList')) {
+    $('langList').querySelectorAll('[data-lang]').forEach((b) => {
+      b.addEventListener('click', () => {
+        setLang(b.dataset.lang);
+        hideModal('langModal');
+      });
     });
   }
 
@@ -1603,6 +1697,11 @@ function wireEvents() {
   window.addEventListener('offline', () => setSyncState('error'));
 }
 
+function stateLangName(code) {
+  const names = { 'zh-TW': '繁體中文', 'zh-CN': '简体中文', 'en': 'English', 'ja': '日本語', 'ko': '한국어', 'es': 'Español', 'fr': 'Français', 'de': 'Deutsch' };
+  return names[code] || code;
+}
+
 function setLang(next) {
   state.lang = next;
   store.set(KEY.lang, next);
@@ -1619,6 +1718,7 @@ async function boot() {
   state.displayName = store.get(KEY.displayName, '');
   state.avatar = store.get(KEY.avatar, '');
   state.healthDone = Object.assign({ water: false, walk: false, sleep: false }, store.get(KEY.health, {}));
+  state.mood = store.get('orbit-mood-' + todayKey(), '');
 
   buildIconPicker();
   buildDayChips();

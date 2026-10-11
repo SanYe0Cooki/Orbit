@@ -247,6 +247,30 @@ input:focus,select:focus,textarea:focus{outline:2px solid color-mix(in srgb,var(
 .health-chips .chip{cursor:pointer}
 .health-chips .chip.on{background:var(--green);border-color:var(--green);color:var(--green-ink)}
 
+/* ---------- daily quote ---------- */
+.quote-card{position:relative;padding:22px 20px 18px;text-align:center}
+.quote-mark{font-size:42px;line-height:0;color:var(--green);opacity:.3;font-family:Georgia,serif}
+.quote-card p{font-size:15.5px;line-height:1.7;color:var(--ink);margin:4px 0 0;font-style:italic}
+
+/* ---------- mood check-in ---------- */
+.mood-card h2{font-size:15px;margin-bottom:12px}
+.mood-row{display:flex;gap:10px;justify-content:space-between}
+.mood-row button{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;border:1px solid var(--line);background:var(--field);border-radius:16px;padding:12px 4px;font-size:26px;transition:all .15s}
+.mood-row button span{font-size:11px;color:var(--muted)}
+.mood-row button:active{transform:scale(.93)}
+.mood-row button.on{background:var(--mint);border-color:var(--green)}
+.mood-row button.on span{color:var(--green);font-weight:700}
+
+/* ---------- suggested chips ---------- */
+#suggestChips .chip{cursor:pointer}
+#suggestChips .chip:active{transform:scale(.95)}
+
+/* ---------- language picker ---------- */
+.lang-list{display:grid;gap:8px;margin-top:14px}
+.lang-list button{border:1px solid var(--line);background:var(--field);border-radius:13px;padding:13px 16px;text-align:left;font-size:15px;transition:all .15s}
+.lang-list button.on{border-color:var(--green);background:var(--mint);font-weight:700;color:var(--green)}
+.lang-list button:active{transform:scale(.98)}
+
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}
 }
@@ -305,6 +329,23 @@ input:focus,select:focus,textarea:focus{outline:2px solid color-mix(in srgb,var(
           </section>
         </div>
       </div>
+
+      <!-- daily quote -->
+      <section class="panel quote-card">
+        <div class="quote-mark">"</div>
+        <p id="dailyQuote"></p>
+      </section>
+
+      <!-- mood check-in -->
+      <section class="panel mood-card">
+        <h2 id="moodTitle">今天心情如何？</h2>
+        <div class="mood-row" id="moodRow">
+          <button type="button" data-mood="great">😄<span>很好</span></button>
+          <button type="button" data-mood="good">🙂<span>不錯</span></button>
+          <button type="button" data-mood="ok">😐<span>普通</span></button>
+          <button type="button" data-mood="tired">😴<span>累了</span></button>
+        </div>
+      </section>
     </section>
 
     <!-- ==================== HABITS ==================== -->
@@ -318,6 +359,22 @@ input:focus,select:focus,textarea:focus{outline:2px solid color-mix(in srgb,var(
         <button class="chip" data-filter="archived" id="filterArchived">已封存</button>
         <button class="chip" data-filter="all" id="filterAll">全部</button>
       </div>
+      <div class="summary" style="margin-top:16px">
+        <div class="stat"><strong id="hActiveCount">0</strong><span>進行中</span></div>
+        <div class="stat"><strong id="hDoneToday">0</strong><span>今日完成</span></div>
+        <div class="stat"><strong id="hTotalLogs">0</strong><span>累計打卡</span></div>
+      </div>
+      <section class="panel" style="margin-top:14px">
+        <div class="panelhead"><h2>試試這些</h2><div class="muted">點一下快速新增</div></div>
+        <div class="chips" id="suggestChips">
+          <button class="chip" data-suggest="喝水">💧 喝水</button>
+          <button class="chip" data-suggest="散步 10 分鐘">🚶 散步</button>
+          <button class="chip" data-suggest="讀書 20 分鐘">📖 讀書</button>
+          <button class="chip" data-suggest="早睡">😴 早睡</button>
+          <button class="chip" data-suggest="冥想 5 分鐘">🧘 冥想</button>
+          <button class="chip" data-suggest="寫日記">✍️ 寫日記</button>
+        </div>
+      </section>
       <section class="panel" style="margin-top:14px">
         <div class="panelhead">
           <h2 id="allHabits">所有習慣</h2>
@@ -537,6 +594,26 @@ input:focus,select:focus,textarea:focus{outline:2px solid color-mix(in srgb,var(
       <div class="err" id="newPassErr"></div>
       <button class="btn primary" type="submit" id="newPassSubmit">更新密碼</button>
     </form>
+  </div>
+</div>
+
+<!-- ==================== language picker ==================== -->
+<div class="backdrop" id="langModal">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="langTitle">
+    <div class="grab"></div>
+    <button class="x" data-close="langModal" aria-label="關閉">×</button>
+    <h2 id="langTitle">選擇語言</h2>
+    <p>Choose your language</p>
+    <div class="lang-list" id="langList">
+      <button type="button" data-lang="zh-TW">繁體中文</button>
+      <button type="button" data-lang="zh-CN">简体中文</button>
+      <button type="button" data-lang="en">English</button>
+      <button type="button" data-lang="ja">日本語</button>
+      <button type="button" data-lang="ko">한국어</button>
+      <button type="button" data-lang="es">Español</button>
+      <button type="button" data-lang="fr">Français</button>
+      <button type="button" data-lang="de">Deutsch</button>
+    </div>
   </div>
 </div>
 
