@@ -594,20 +594,29 @@ function renderChart() {
   }
   const max = Math.max(1, ...days.map((d) => d.done));
   $('weekChart').innerHTML = days.map((d) => {
-    const h = d.done ? Math.max(6, Math.round((d.done / max) * 100)) : 2;
     const title = d.done + '/' + d.scheduled;
-    // emoji: completion state takes priority, otherwise rotating weather by weekday
-    const weather = ['☀️','⛅','🌤️','🌦️','🌈','🌙','❄️'];
+    // weather emoji by weekday
+    const weather = [
+      { e: '☀️', bg: 'linear-gradient(180deg,#f5c86a,#f0a04b)' },
+      { e: '⛅', bg: 'linear-gradient(180deg,#9aabba,#7a8a9a)' },
+      { e: '🌤️', bg: 'linear-gradient(180deg,#8cb4c9,#6a8caf)' },
+      { e: '🌦️', bg: 'linear-gradient(180deg,#7a9ab8,#5a7a9a)' },
+      { e: '🌈', bg: 'linear-gradient(180deg,#e8b4b8,#b8c9e8)' },
+      { e: '🌙', bg: 'linear-gradient(180deg,#4a5a7a,#2a3a5a)' },
+      { e: '❄️', bg: 'linear-gradient(180deg,#cdddee,#aac4dd)' }
+    ];
+    const wi = dayIndex(dateFromKey(d.key)) % weather.length;
+    const w = weather[wi];
+    // completion overrides the weather color
     const ratio = d.scheduled ? d.done / d.scheduled : 0;
-    let emoji;
-    if (d.scheduled === 0) emoji = '💤';
-    else if (ratio >= 1) emoji = '🎉';
-    else if (ratio > 0) emoji = '🌱';
-    else emoji = weather[dayIndex(dateFromKey(d.key)) % weather.length];
+    let barBg = w.bg;
+    if (d.scheduled === 0) barBg = 'linear-gradient(180deg,#e8e8e8,#d8d8d8)';
+    else if (ratio >= 1) barBg = 'linear-gradient(180deg,#5a9a6a,#3a7a4a)';
+    else if (ratio > 0) barBg = 'linear-gradient(180deg,#8bc4a0,#5a9a6a)';
     return '<div class="barcol' + (d.today ? ' today' : '') + '" title="' + title + '">' +
-      '<div class="bar-emoji">' + emoji + '</div>' +
-      '<div class="bar"><i style="height:' + h + '%"></i></div>' +
-      '<b>' + d.done + '</b><span>' + esc(d.label) + '</span>' +
+      '<div class="bar-emoji">' + w.e + '</div>' +
+      '<div class="bar weather-bar" style="background:' + barBg + ';height:80px"><i style="height:0%"></i></div>' +
+      '<span>' + esc(d.label) + '</span>' +
     '</div>';
   }).join('');
   $('totalLogs').textContent = String(state.logs.filter((l) => (Number(l.completed_count) || 1) > 0).length);
