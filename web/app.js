@@ -596,9 +596,14 @@ function renderChart() {
   $('weekChart').innerHTML = days.map((d) => {
     const h = d.done ? Math.max(6, Math.round((d.done / max) * 100)) : 2;
     const title = d.done + '/' + d.scheduled;
-    // pick an emoji based on completion ratio
+    // emoji: completion state takes priority, otherwise rotating weather by weekday
+    const weather = ['☀️','⛅','🌤️','🌦️','🌈','🌙','❄️'];
     const ratio = d.scheduled ? d.done / d.scheduled : 0;
-    const emoji = d.scheduled === 0 ? '💤' : (ratio >= 1 ? '🎉' : ratio > 0 ? '🌱' : '😴');
+    let emoji;
+    if (d.scheduled === 0) emoji = '💤';
+    else if (ratio >= 1) emoji = '🎉';
+    else if (ratio > 0) emoji = '🌱';
+    else emoji = weather[dayIndex(dateFromKey(d.key)) % weather.length];
     return '<div class="barcol' + (d.today ? ' today' : '') + '" title="' + title + '">' +
       '<div class="bar-emoji">' + emoji + '</div>' +
       '<div class="bar"><i style="height:' + h + '%"></i></div>' +
