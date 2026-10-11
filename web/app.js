@@ -128,8 +128,10 @@ const DICT = {
     schedule: '重複的日子', daily: '每天', target: '一天幾次', save: '儲存習慣', saveEdit: '儲存變更',
     authTitle: '登入 Orbit', authDesc: '用電子郵件註冊或登入，習慣就會在手機與電腦之間同步。',
     email: '電子郵件', password: '密碼', passwordHint: '至少 6 個字元',
-    authSubmit: '登入 / 建立帳號', authMode: '還沒有帳號？建立帳號',
+    authSubmit: '登入 / 建立帳號', authSubmitSignup: '建立帳號', authSubmitLogin: '登入',
+    authMode: '還沒有帳號？建立帳號',
     authModeBack: '已經有帳號？登入', authNotice: '若需驗證電子郵件，請查看你的收件匣（包含垃圾郵件）。',
+    authNoticeSignup: '輸入電子郵件與密碼就能建立帳號。',
     forgot: '忘記密碼', resetTitle: '重設密碼',
     resetDesc: '輸入註冊用的電子郵件，我們會寄送重設連結給你。',
     resetEmail: '電子郵件', resetSubmit: '寄送重設連結', newPassTitle: '設定新密碼',
@@ -141,6 +143,8 @@ const DICT = {
     confirmDeleteAccount: '這會永久刪除你的帳號、所有習慣與打卡紀錄。要繼續嗎？',
     confirmMerge: '要把這台裝置上的習慣合併到你的帳號嗎？合併不會刪除雲端既有的紀錄。',
     welcome: '歡迎回來！', signedOut: '已登出', sent: '請查看電子郵件完成驗證。',
+    accountReady: '註冊完成，已直接登入！',
+    confirmPending: '這個信箱可能已經註冊過，請確認密碼是否正確；若剛註冊過，請先完成信箱驗證。',
     saved: '已儲存', deleted: '已刪除', updated: '已更新',
     needLogin: '請先登入再同步。', needEmail: '請輸入有效的電子郵件。',
     needName: '請輸入習慣名稱。', needDay: '請至少選一天。',
@@ -195,8 +199,10 @@ const DICT = {
     schedule: 'Repeat on', daily: 'Every day', target: 'Times per day', save: 'Save habit', saveEdit: 'Save changes',
     authTitle: 'Sign in to Orbit', authDesc: 'Register or sign in with your email to sync across devices.',
     email: 'Email address', password: 'Password', passwordHint: 'At least 6 characters',
-    authSubmit: 'Sign in / Create account', authMode: 'New here? Create an account',
+    authSubmit: 'Sign in / Create account', authSubmitSignup: 'Create account', authSubmitLogin: 'Sign in',
+    authMode: 'New here? Create an account',
     authModeBack: 'Already have an account? Sign in', authNotice: 'If email confirmation is required, check your inbox (and spam).',
+    authNoticeSignup: 'Enter an email and a password to create your account.',
     forgot: 'Forgot password', resetTitle: 'Reset password',
     resetDesc: 'Enter the email you registered with and we will send a reset link.',
     resetEmail: 'Email address', resetSubmit: 'Send reset link', newPassTitle: 'Set a new password',
@@ -208,6 +214,8 @@ const DICT = {
     confirmDeleteAccount: 'This permanently deletes your account, all habits and all check-ins. Continue?',
     confirmMerge: 'Merge the habits on this device into your account? Existing cloud records are kept.',
     welcome: 'Welcome back!', signedOut: 'Signed out', sent: 'Check your email to finish verification.',
+    accountReady: 'Account created — you are signed in!',
+    confirmPending: 'That email may already be registered — check the password, or finish verifying the address first.',
     saved: 'Saved', deleted: 'Deleted', updated: 'Updated',
     needLogin: 'Sign in to sync your data.', needEmail: 'Enter a valid email address.',
     needName: 'Give the habit a name.', needDay: 'Pick at least one day.',
@@ -533,7 +541,8 @@ function applyStrings() {
     saveHabitBtn: state.editingId ? 'saveEdit' : 'save',
     authTitle: 'authTitle', authDesc: 'authDesc', emailLabel: 'email', passwordLabel: 'password',
     passwordHint: 'passwordHint', authModeBtn: state.authMode === 'login' ? 'authMode' : 'authModeBack',
-    authNotice: 'authNotice', forgotBtn: 'forgot',
+    authSubmit: state.authMode === 'signup' ? 'authSubmitSignup' : 'authSubmitLogin',
+    authNotice: state.authMode === 'signup' ? 'authNoticeSignup' : 'authNotice', forgotBtn: 'forgot',
     resetTitle: 'resetTitle', resetDesc: 'resetDesc', resetEmailLabel: 'resetEmail', resetSubmit: 'resetSubmit',
     newPassTitle: 'newPassTitle', newPassDesc: 'newPassDesc', newPassLabel: 'newPass', newPassSubmit: 'newPassSubmit',
     filterActive: 'filterActive', filterPaused: 'filterPaused', filterArchived: 'filterArchived', filterAll: 'filterAll',
@@ -908,6 +917,15 @@ function authError(message) {
   $('authErr').textContent = message || '';
 }
 
+/** Explains an "email not confirmed" error instead of showing the raw wording. */
+function showEmailConfirmationHelp(email) {
+  const zh = state.lang !== 'en';
+  authError(zh
+    ? '這個帳號還沒完成驗證。請先在 Supabase 後台關閉 Confirm email（Authentication → Sign In / Providers → Email），或改用你自己的寄信服務。'
+    : 'This account is not confirmed yet. Turn off Confirm email in Supabase (Authentication → Sign In / Providers → Email), or configure your own SMTP.');
+  console.warn('[orbit] email confirmation is enabled on the Supabase project for ' + email);
+}
+
 async function submitAuth(event) {
   event.preventDefault();
   if (state.busy || !state.supabase) { if (!state.supabase) authError(t('netError')); return; }
@@ -928,15 +946,33 @@ async function submitAuth(event) {
         options: { emailRedirectTo: redirectUrl(), data: { locale: state.lang } }
       });
       if (res.error) throw res.error;
+
+      // Confirmation disabled: signUp already returns a session, so the user is
+      // registered and signed in with no email involved.
       if (res.data && res.data.session) {
         await adoptSession(res.data.session);
         hideModal('authModal');
-        toast(t('welcome'));
-      } else {
-        // Email confirmation is enabled on the Supabase project.
-        hideModal('authModal');
-        toast(t('sent'));
+        toast(t('accountReady'));
+        return;
       }
+
+      // No session came back. Either confirmation is enabled, or the address is
+      // already registered (Supabase hides which, on purpose). Try to sign in
+      // straight away: that succeeds when confirmation is off, and gives a
+      // precise "Email not confirmed" error when it is on.
+      const signIn = await sb.auth.signInWithPassword({ email, password });
+      if (!signIn.error && signIn.data && signIn.data.session) {
+        await adoptSession(signIn.data.session);
+        hideModal('authModal');
+        toast(t('accountReady'));
+        return;
+      }
+      if (signIn.error && /not confirmed/i.test(signIn.error.message || '')) {
+        showEmailConfirmationHelp(email);
+        return;
+      }
+      // Already registered with a different password, or confirmation pending.
+      authError(signIn.error ? friendlyError(signIn.error) : t('confirmPending'));
     } else {
       const res = await sb.auth.signInWithPassword({ email, password });
       if (res.error) throw res.error;
@@ -945,7 +981,11 @@ async function submitAuth(event) {
       toast(t('welcome'));
     }
   } catch (error) {
-    authError(friendlyError(error));
+    if (/not confirmed/i.test((error && error.message) || '')) {
+      showEmailConfirmationHelp(email);
+    } else {
+      authError(friendlyError(error));
+    }
   } finally {
     spinner(false);
     $('authSubmit').disabled = false;
