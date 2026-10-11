@@ -53,6 +53,7 @@ const state = {
   progress: new Map(),
   displayName: '',
   avatar: '',
+  userNumber: null,
   healthDone: { water: false, walk: false, sleep: false },
   mood: '',
   accent: '',
@@ -416,7 +417,8 @@ function applyProfileInfo() {
   const name = state.displayName || (state.session ? (state.session.user.email || 'Orbit').split('@')[0] : '訪客');
   $('profileDisplayName').textContent = name;
   if (state.session) {
-    $('profileUserId').textContent = 'ID: ' + state.session.user.id.slice(0, 8) + '…';
+    const num = state.userNumber ? String(state.userNumber).padStart(6, '0') : '------';
+    $('profileUserId').textContent = 'ID: ' + num;
     $('profileUserEmail').textContent = state.session.user.email || '';
   } else {
     $('profileUserId').textContent = state.displayName ? '本地資料' : '尚未登入';
@@ -483,6 +485,7 @@ async function loadProfileFromCloud() {
     if (!data) return;
     if (data.display_name) { state.displayName = data.display_name; store.set(KEY.displayName, data.display_name); }
     if (data.avatar_url) { state.avatar = data.avatar_url; store.set(KEY.avatar, data.avatar_url); }
+    if (data.user_number) { state.userNumber = data.user_number; }
   } catch (e) { /* profiles table may be empty — fine */ }
 }
 
@@ -593,7 +596,11 @@ function renderChart() {
   $('weekChart').innerHTML = days.map((d) => {
     const h = d.done ? Math.max(6, Math.round((d.done / max) * 100)) : 2;
     const title = d.done + '/' + d.scheduled;
+    // pick an emoji based on completion ratio
+    const ratio = d.scheduled ? d.done / d.scheduled : 0;
+    const emoji = d.scheduled === 0 ? '💤' : (ratio >= 1 ? '🎉' : ratio > 0 ? '🌱' : '😴');
     return '<div class="barcol' + (d.today ? ' today' : '') + '" title="' + title + '">' +
+      '<div class="bar-emoji">' + emoji + '</div>' +
       '<div class="bar"><i style="height:' + h + '%"></i></div>' +
       '<b>' + d.done + '</b><span>' + esc(d.label) + '</span>' +
     '</div>';
@@ -777,14 +784,25 @@ function cycleTheme() {
 }
 
 function applyAccent() {
-  if (!state.accent) {
-    document.documentElement.style.removeProperty('--green');
-    document.documentElement.style.removeProperty('--mint');
-  } else {
-    document.documentElement.style.setProperty('--green', state.accent);
-    // derive a lighter mint from the accent
-    document.documentElement.style.setProperty('--mint', state.accent + '22');
+  const root = document.documentElement;
+  // Preset pairs: [accent, ink-on-accent, light-mint]
+  const PRESETS = {
+    '#315b49': { ink: '#fff', mint: '#e6eee5' },
+    '#4a6fa5': { ink: '#fff', mint: '#e3ebf5' },
+    '#8b5a8c': { ink: '#fff', mint: '#f0e4f0' },
+    '#b85c3c': { ink: '#fff', mint: '#f7e6de' },
+    '#5a7d5a': { ink: '#fff', mint: '#e4ede4' }
+  };
+  if (!state.accent || !PRESETS[state.accent]) {
+    root.style.removeProperty('--green');
+    root.style.removeProperty('--green-ink');
+    root.style.removeProperty('--mint');
+    return;
   }
+  const p = PRESETS[state.accent];
+  root.style.setProperty('--green', state.accent);
+  root.style.setProperty('--green-ink', p.ink);
+  root.style.setProperty('--mint', p.mint);
 }
 
 async function toggleReminder() {

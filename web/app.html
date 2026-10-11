@@ -168,6 +168,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid color-mix(in srgb,var(
 .bar{flex:1;width:100%;display:flex;align-items:flex-end;background:var(--line-soft);border-radius:9px;overflow:hidden;min-height:8px}
 .bar i{display:block;width:100%;min-height:4px;background:linear-gradient(180deg,var(--green),color-mix(in srgb,var(--green) 62%,var(--mint)));border-radius:9px;transition:height .5s cubic-bezier(.2,.8,.25,1)}
 .barcol b{font-size:11px}
+.bar-emoji{font-size:16px;margin-bottom:2px}
 .barcol span{font-size:10.5px;color:var(--muted)}
 .barcol.today b{color:var(--green)}
 
@@ -408,6 +409,17 @@ input:focus,select:focus,textarea:focus{outline:2px solid color-mix(in srgb,var(
         <div class="panelhead"><h2 id="bestTitle">最穩定的習慣</h2></div>
         <div id="bestList"></div>
       </section>
+
+      <!-- wellness -->
+      <section class="panel health-card">
+        <div class="panelhead"><h2 id="healthTitle">🌿 健康小提醒</h2></div>
+        <p id="healthTip" class="health-tip"></p>
+        <div class="health-chips">
+          <button class="chip" id="waterBtn">💧 喝水</button>
+          <button class="chip" id="walkBtn">🚶 動一動</button>
+          <button class="chip" id="sleepBtn">😴 早睡</button>
+        </div>
+      </section>
     </section>
 
     <!-- ==================== PROFILE ==================== -->
@@ -447,17 +459,6 @@ input:focus,select:focus,textarea:focus{outline:2px solid color-mix(in srgb,var(
           <span>✓ 資料匯出</span>
         </div>
         <button class="btn primary vip-upgrade" id="upgradeBtn">升級 Pro · 解鎖進階統計</button>
-      </section>
-
-      <!-- wellness -->
-      <section class="panel health-card">
-        <div class="panelhead"><h2 id="healthTitle">🌿 健康小提醒</h2></div>
-        <p id="healthTip" class="health-tip"></p>
-        <div class="health-chips">
-          <button class="chip" id="waterBtn">💧 喝水</button>
-          <button class="chip" id="walkBtn">🚶 動一動</button>
-          <button class="chip" id="sleepBtn">😴 早睡</button>
-        </div>
       </section>
 
       <!-- settings -->
