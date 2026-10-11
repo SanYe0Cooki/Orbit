@@ -27,7 +27,10 @@ const KEY = {
   logs: 'orbit-logs-v1',
   lang: 'orbit-lang-v1',
   theme: 'orbit-theme-v1',
-  onboard: 'orbit-onboarded-v1'
+  onboard: 'orbit-onboarded-v1',
+  displayName: 'orbit-display-name-v1',
+  avatar: 'orbit-avatar-v1',
+  health: 'orbit-health-v1'
 };
 
 /* ------------------------------------------------------------------ state */
@@ -47,7 +50,10 @@ const state = {
   syncTimer: null,
   syncState: 'idle', // idle | syncing | ok | error
   native: false,
-  progress: new Map()
+  progress: new Map(),
+  displayName: '',
+  avatar: '',
+  healthDone: { water: false, walk: false, sleep: false }
 };
 
 const $ = (id) => document.getElementById(id);
@@ -328,6 +334,122 @@ function scheduleText(habit) {
   return days.map((d) => names[d]).join(' ');
 }
 
+/* ------------------------------------------------------------- wellness */
+const HEALTH_TIPS = {
+  'zh-TW': [
+    '💧 記得喝水，一天建議喝 1500–2000ml，分次飲用。',
+    '🚶 久坐超過一小時，站起來走兩分鐘，讓眼睛和肩膀休息。',
+    '😴 睡前一小時放下手機，燈光調暗，有助於入眠。',
+    '🧘 腹式呼吸五分鐘：吸氣四秒、屏息四秒、吐氣六秒。',
+    '🌿 今天曬到太陽了嗎？戶外十分鐘有助於維持生理時鐘。',
+    '🥗 三餐定時，蔬菜佔餐盘一半，蛋白質和澱粉各四分之一。',
+    '✍️ 寫下三件今天感謝的小事，大腦會更習慣注意好事。'
+  ],
+  'en': [
+    '💧 Stay hydrated — aim for 1.5–2L of water throughout the day.',
+    '🚶 Stand up and stretch for 2 minutes after every hour of sitting.',
+    '😴 Put your phone down an hour before bed — dim the lights.',
+    '🧘 Try 5 minutes of box breathing: 4s in, 4s hold, 6s out.',
+    '🌿 Got some sun today? 10 minutes outdoors helps your circadian rhythm.',
+    '🥗 Keep meals regular: half the plate veggies, quarter protein, quarter carbs.',
+    '✍️ Write down three small things you appreciated today.'
+  ]
+};
+function dailyHealthTip() {
+  const tips = HEALTH_TIPS[state.lang] || HEALTH_TIPS['en'];
+  const day = Math.floor(Date.now() / 86400000);
+  return tips[day % tips.length];
+}
+
+/* ------------------------------------------------------------- avatar / name */
+function applyAvatar() {
+  const img = $('avatarImg');
+  const fallback = $('avatarFallback');
+  if (state.avatar) {
+    img.src = state.avatar;
+    img.style.display = 'block';
+    fallback.style.display = 'none';
+  } else {
+    img.style.display = 'none';
+    fallback.style.display = 'block';
+    fallback.textContent = state.displayName ? state.displayName.charAt(0).toUpperCase() : '◌';
+  }
+}
+
+function applyProfileInfo() {
+  const name = state.displayName || (state.session ? (state.session.user.email || 'Orbit').split('@')[0] : '訪客');
+  $('profileDisplayName').textContent = name;
+  if (state.session) {
+    $('profileUserId').textContent = 'ID: ' + state.session.user.id.slice(0, 8) + '…';
+    $('profileUserEmail').textContent = state.session.user.email || '';
+  } else {
+    $('profileUserId').textContent = state.displayName ? '本地資料' : '尚未登入';
+    $('profileUserEmail').textContent = '';
+  }
+  applyAvatar();
+}
+
+function handleAvatarFile(file) {
+  if (!file || !file.type.startsWith('image/')) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const size = 128;
+      canvas.width = size; canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      // cover-crop to square
+      const scale = Math.max(size / img.width, size / img.height);
+      const w = img.width * scale, h = img.height * scale;
+      ctx.drawImage(img, (size - w) / 2, (size - h) / 2, w, h);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+      state.avatar = dataUrl;
+      store.set(KEY.avatar, dataUrl);
+      applyAvatar();
+      syncProfile();
+      toast('頭像已更新');
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+async function editDisplayName() {
+  const current = state.displayName || '';
+  const next = window.prompt(state.lang === 'en' ? 'Enter your name' : '輸入你的名字', current);
+  if (next === null) return;
+  const trimmed = next.trim().slice(0, 20);
+  if (!trimmed) return;
+  state.displayName = trimmed;
+  store.set(KEY.displayName, trimmed);
+  applyProfileInfo();
+  syncProfile();
+  toast('已儲存');
+}
+
+async function syncProfile() {
+  if (!state.session || !state.supabase) return;
+  const uid = state.session.user.id;
+  const patch = {};
+  if (state.displayName) patch.display_name = state.displayName;
+  // avatar_url column is added by migration 004; ignore if it does not exist yet
+  if (state.avatar) patch.avatar_url = state.avatar;
+  try {
+    await state.supabase.from('profiles').upsert({ id: uid, ...patch });
+  } catch (e) { /* column may not exist yet — non-fatal */ }
+}
+
+async function loadProfileFromCloud() {
+  if (!state.session || !state.supabase) return;
+  try {
+    const { data } = await state.supabase.from('profiles').select('*').eq('id', state.session.user.id).single();
+    if (!data) return;
+    if (data.display_name) { state.displayName = data.display_name; store.set(KEY.displayName, data.display_name); }
+    if (data.avatar_url) { state.avatar = data.avatar_url; store.set(KEY.avatar, data.avatar_url); }
+  } catch (e) { /* profiles table may be empty — fine */ }
+}
+
 /* ------------------------------------------------------------- rendering */
 const ICONS = ['✦', '💧', '🏃', '📖', '🧘', '🥗', '😴', '🎧', '✍️', '🧹', '💊', '☀️', '🌙', '🚶', '🎯', '💪'];
 
@@ -515,6 +637,13 @@ function render() {
   $('localNote').classList.toggle('hidden', !!state.session);
   $('dangerPanel').classList.toggle('hidden', !state.session);
   $('versionValue').textContent = CONFIG.appVersion;
+
+  // profile hero + wellness
+  applyProfileInfo();
+  $('healthTip').textContent = dailyHealthTip();
+  $('waterBtn').classList.toggle('on', state.healthDone.water);
+  $('walkBtn').classList.toggle('on', state.healthDone.walk);
+  $('sleepBtn').classList.toggle('on', state.healthDone.sleep);
 
   applyStrings();
 }
@@ -1018,6 +1147,7 @@ function redirectUrl() {
 
 async function adoptSession(session) {
   state.session = session;
+  await loadProfileFromCloud();
   const localCount = state.habits.length;
   if (session && localCount) {
     const cloud = await state.supabase.from('habits').select('id').eq('user_id', session.user.id).limit(1);
@@ -1263,7 +1393,9 @@ function wireEvents() {
     'themeBtn', 'themeBtn2', 'confirmOk', 'confirmCancel', 'confirmDesc', 'confirmTitle',
     'syncState', 'habitList', 'allHabitList', 'weekChart', 'bestList', 'profileStatus', 'storageStatus',
     'localNote', 'dangerPanel', 'versionValue', 'doneCount', 'streakCount', 'progressRing', 'progressPct',
-    'progressHeadline', 'progressCopy', 'restNote', 'dateText', 'totalLogs', 'activeHabits', 'toast'
+    'progressHeadline', 'progressCopy', 'restNote', 'dateText', 'totalLogs', 'activeHabits', 'toast',
+    'avatarBtn', 'avatarFile', 'profileDisplayName', 'profileUserId', 'nameEditBtn',
+    'upgradeBtn', 'healthTip', 'waterBtn', 'walkBtn', 'sleepBtn'
   ];
   const missing = REQUIRED.filter((id) => !$(id));
   if (missing.length) {
@@ -1409,6 +1541,26 @@ function wireEvents() {
   $('themeBtn').addEventListener('click', cycleTheme);
   $('themeBtn2').addEventListener('click', cycleTheme);
 
+  // profile hero
+  $('avatarBtn').addEventListener('click', () => $('avatarFile').click());
+  $('avatarFile').addEventListener('change', (e) => {
+    const f = e.target.files && e.target.files[0];
+    if (f) handleAvatarFile(f);
+    e.target.value = '';
+  });
+  $('nameEditBtn').addEventListener('click', editDisplayName);
+  $('upgradeBtn').addEventListener('click', () => toast(state.lang === 'en' ? 'Pro coming soon ✦' : 'Pro 即將推出 ✦'));
+  // wellness chips
+  const chipMap = { waterBtn: 'water', walkBtn: 'walk', sleepBtn: 'sleep' };
+  for (const [id, key] of Object.entries(chipMap)) {
+    $(id).addEventListener('click', () => {
+      state.healthDone[key] = !state.healthDone[key];
+      store.set(KEY.health, state.healthDone);
+      render();
+      toast(state.healthDone[key] ? '✓' : '');
+    });
+  }
+
   $('confirmOk').addEventListener('click', () => resolveConfirm(true));
   $('confirmCancel').addEventListener('click', () => resolveConfirm(false));
 
@@ -1464,6 +1616,9 @@ async function boot() {
   state.habits = store.get(KEY.habits, []);
   state.logs = store.get(KEY.logs, []);
   state.progress = new Map();
+  state.displayName = store.get(KEY.displayName, '');
+  state.avatar = store.get(KEY.avatar, '');
+  state.healthDone = Object.assign({ water: false, walk: false, sleep: false }, store.get(KEY.health, {}));
 
   buildIconPicker();
   buildDayChips();

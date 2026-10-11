@@ -219,6 +219,34 @@ input:focus,select:focus,textarea:focus{outline:2px solid color-mix(in srgb,var(
 .stepper button{width:42px;height:42px;border-radius:13px;border:1px solid var(--line);background:var(--field);font-size:19px}
 .stepper b{font-size:17px;min-width:26px;text-align:center}
 
+/* ---------- profile hero ---------- */
+.profile-hero{display:flex;align-items:center;gap:16px;margin-top:18px;background:linear-gradient(135deg,var(--card) 60%,var(--mint))}
+.avatar-btn{position:relative;width:72px;height:72px;border-radius:50%;border:2px solid var(--line);background:var(--mint);display:grid;place-items:center;flex-shrink:0;overflow:hidden;font-size:30px;color:var(--green);transition:transform .15s}
+.avatar-btn:active{transform:scale(.94)}
+.avatar-btn img{width:100%;height:100%;object-fit:cover}
+.avatar-cam{position:absolute;bottom:-2px;right:-2px;font-size:14px;background:var(--card);border-radius:50%;width:24px;height:24px;display:grid;place-items:center;border:1.5px solid var(--card)}
+.profile-hero-info{flex:1;min-width:0}
+.name-row{display:flex;align-items:center;gap:6px}
+.name-row strong{font-size:19px;letter-spacing:-.4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.name-edit{width:30px;height:30px;min-height:30px;font-size:13px;color:var(--muted)}
+.user-id{display:block;font-size:11px;color:var(--muted);font-family:monospace;letter-spacing:-.2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.user-email{display:block;font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ---------- vip card ---------- */
+.vip-card{position:relative;overflow:hidden;text-align:center}
+.vip-glow{position:absolute;top:-40%;right:-20%;width:200px;height:200px;background:radial-gradient(circle,var(--mint),transparent 70%);opacity:.6;pointer-events:none}
+.vip-badge{display:inline-block;font-size:10px;font-weight:800;letter-spacing:2px;color:var(--green);background:var(--mint);padding:4px 12px;border-radius:99px;margin-bottom:8px}
+.vip-card h2{font-size:20px;letter-spacing:-.5px}
+.vip-perks{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:12px 0 14px}
+.vip-perks span{font-size:11.5px;color:var(--muted);background:var(--line-soft);padding:5px 10px;border-radius:99px}
+.vip-upgrade{max-width:320px;margin:0 auto}
+
+/* ---------- health card ---------- */
+.health-tip{font-size:14px;line-height:1.6;color:var(--ink);margin:0 0 12px}
+.health-chips{display:flex;gap:8px;flex-wrap:wrap}
+.health-chips .chip{cursor:pointer}
+.health-chips .chip.on{background:var(--green);border-color:var(--green);color:var(--green-ink)}
+
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}
 }
@@ -323,7 +351,53 @@ input:focus,select:focus,textarea:focus{outline:2px solid color-mix(in srgb,var(
       <div class="eyebrow" id="profileEyebrow">YOUR ORBIT</div>
       <h1 class="sectiontitle" id="profileHeading">個人設定</h1>
       <p class="sub" id="profileSub">讓 Orbit 配合你的生活節奏。</p>
-      <section class="panel" style="margin-top:18px">
+
+      <!-- profile hero: avatar + name + id -->
+      <section class="panel profile-hero">
+        <button class="avatar-btn" id="avatarBtn" aria-label="更換頭像">
+          <img id="avatarImg" alt="" style="display:none">
+          <span id="avatarFallback">◌</span>
+          <i class="avatar-cam">📷</i>
+        </button>
+        <div class="profile-hero-info">
+          <div class="name-row">
+            <strong id="profileDisplayName">訪客</strong>
+            <button class="iconbtn name-edit" id="nameEditBtn" aria-label="修改名稱" title="修改名稱">✎</button>
+          </div>
+          <small class="user-id" id="profileUserId">尚未登入</small>
+          <small class="user-email" id="profileUserEmail"></small>
+        </div>
+        <input type="file" id="avatarFile" accept="image/*" class="hidden">
+      </section>
+
+      <!-- membership -->
+      <section class="panel vip-card">
+        <div class="vip-glow"></div>
+        <div class="vip-badge">✦ ORBIT PRO</div>
+        <h2 id="vipTitle">免費版</h2>
+        <p class="muted" id="vipDesc">基本功能永久免費</p>
+        <div class="vip-perks">
+          <span>✓ 無限習慣</span>
+          <span>✓ 雲端同步</span>
+          <span>✓ 深色模式</span>
+          <span>✓ 資料匯出</span>
+        </div>
+        <button class="btn primary vip-upgrade" id="upgradeBtn">升級 Pro · 解鎖進階統計</button>
+      </section>
+
+      <!-- wellness -->
+      <section class="panel health-card">
+        <div class="panelhead"><h2 id="healthTitle">🌿 健康小提醒</h2></div>
+        <p id="healthTip" class="health-tip"></p>
+        <div class="health-chips">
+          <button class="chip" id="waterBtn">💧 喝水</button>
+          <button class="chip" id="walkBtn">🚶 動一動</button>
+          <button class="chip" id="sleepBtn">😴 早睡</button>
+        </div>
+      </section>
+
+      <!-- settings -->
+      <section class="panel" style="margin-top:14px">
         <div class="profileline"><span id="accountStatusLabel">帳號狀態</span><b class="val" id="profileStatus">訪客模式</b></div>
         <div class="profileline"><span id="languageLabel">介面語言</span><button class="smalllink" id="langBtn2">切換語言</button></div>
         <div class="profileline"><span id="themeLabel">外觀</span><button class="smalllink" id="themeBtn2">跟隨系統</button></div>
@@ -336,6 +410,8 @@ input:focus,select:focus,textarea:focus{outline:2px solid color-mix(in srgb,var(
         </div>
         <div class="notice" id="profileNote">登入後，習慣與打卡記錄會同步到你的帳號。</div>
       </section>
+
+      <!-- about -->
       <section class="panel">
         <div class="panelhead"><h2 id="aboutTitle">關於 Orbit</h2></div>
         <div class="profileline"><span id="versionLabel">版本</span><b class="val" id="versionValue">—</b></div>
@@ -344,6 +420,8 @@ input:focus,select:focus,textarea:focus{outline:2px solid color-mix(in srgb,var(
         <div class="profileline"><span id="exportLabel2">資料備份</span><button class="smalllink" id="exportBtn2">匯出</button></div>
         <div class="notice" id="healthNote">Orbit 是一般生活習慣工具，不是醫療服務，也不能取代專業建議。</div>
       </section>
+
+      <!-- danger -->
       <section class="panel hidden" id="dangerPanel">
         <div class="panelhead"><h2 id="dangerTitle">帳號與資料</h2></div>
         <div class="notice" id="dangerNote">刪除帳號會永久移除你的習慣與打卡紀錄，無法復原。</div>
