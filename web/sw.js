@@ -1,7 +1,7 @@
 /* Orbit service worker — app shell caching so the app opens offline.
    Bump CACHE_VERSION whenever app.html / app.js / sw.js change, otherwise
    installed clients keep serving the previous build. */
-const CACHE_VERSION = 'orbit-v2.0.2';
+const CACHE_VERSION = 'orbit-v2.0.3';
 const PRECACHE = [
   './',
   'index.html',

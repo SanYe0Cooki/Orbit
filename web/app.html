@@ -106,6 +106,13 @@ input,textarea{-webkit-user-select:text;user-select:text}
 h1.sectiontitle{font-size:clamp(25px,7vw,34px);letter-spacing:-1.2px;margin:8px 0 5px}
 .sub{color:var(--muted);margin:0;font-size:14.5px}
 .summary{display:flex;gap:9px;margin-top:18px}
+.side{margin-top:14px}
+@media(min-width:640px){
+  .layout{display:grid;grid-template-columns:1.4fr 1fr;gap:14px;align-items:start}
+  .layout>.panel{margin-top:0}
+  .side{display:grid;gap:14px;margin-top:0}
+  .side .panel{margin-top:0}
+}
 .stat{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:12px 15px;flex:1;min-width:0}
 .stat strong{font-size:21px;display:block;letter-spacing:-.8px}
 .stat span{font-size:11px;color:var(--muted)}

@@ -921,9 +921,9 @@ function authError(message) {
 function showEmailConfirmationHelp(email) {
   const zh = state.lang !== 'en';
   authError(zh
-    ? '這個帳號還沒完成驗證。請先在 Supabase 後台關閉 Confirm email（Authentication → Sign In / Providers → Email），或改用你自己的寄信服務。'
-    : 'This account is not confirmed yet. Turn off Confirm email in Supabase (Authentication → Sign In / Providers → Email), or configure your own SMTP.');
-  console.warn('[orbit] email confirmation is enabled on the Supabase project for ' + email);
+    ? '這個帳號尚未完成驗證。請稍後再試，或使用「忘記密碼」重新設定。'
+    : 'This account has not been verified yet. Please try again later, or use "Forgot password" to reset it.');
+  console.warn('[orbit] email not confirmed for ' + email + ' — run supabase/migrations/003_auto_confirm_email.sql');
 }
 
 /**
