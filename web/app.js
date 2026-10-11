@@ -54,7 +54,9 @@ const state = {
   displayName: '',
   avatar: '',
   healthDone: { water: false, walk: false, sleep: false },
-  mood: ''
+  mood: '',
+  accent: '',
+  reminderOn: false
 };
 
 const $ = (id) => document.getElementById(id);
@@ -543,7 +545,9 @@ function habitRowHtml(habit, opts) {
         '<small>' + esc(meta + counter + (habit.description ? ' · ' + habit.description : '')) + '</small></span>' +
       '</button>' +
       (archived ? '' :
-        '<button type="button" class="tick ' + (done ? 'done' : '') + '" data-toggle="' + habit.id + '" aria-label="' + (done ? t('undo') : t('done')) + '" aria-pressed="' + done + '">✓</button>') +
+        '<button type="button" class="tick ' + (done ? 'done' : '') + '" data-toggle="' + habit.id + '" aria-label="' + (done ? t('undo') : t('done')) + '" aria-pressed="' + done + '">' +
+        (target > 1 ? '<span class="tick-num">' + Math.min(count, target) + '/' + target + '</span>' : '✓') +
+        '</button>') +
     '</div>';
   if (!open) return row;
   const actions =
@@ -692,6 +696,13 @@ function render() {
   if ($('hDoneToday')) $('hDoneToday').textContent = String(todayHabits().filter((h) => isDone(h.id, todayKey())).length);
   if ($('hTotalLogs')) $('hTotalLogs').textContent = String(state.logs.filter((l) => (Number(l.completed_count) || 1) > 0).length);
 
+  // reminder button label
+  if ($('reminderBtn')) $('reminderBtn').textContent = state.reminderOn ? '已開啟 ✓' : '開啟';
+  // accent color dots
+  if ($('colorRow')) {
+    $('colorRow').querySelectorAll('.color-dot').forEach((x) => x.classList.toggle('on', x.dataset.color === state.accent));
+  }
+
   applyStrings();
 }
 
@@ -763,6 +774,59 @@ function cycleTheme() {
   store.set(KEY.theme, state.theme);
   applyTheme();
   applyStrings();
+}
+
+function applyAccent() {
+  if (!state.accent) {
+    document.documentElement.style.removeProperty('--green');
+    document.documentElement.style.removeProperty('--mint');
+  } else {
+    document.documentElement.style.setProperty('--green', state.accent);
+    // derive a lighter mint from the accent
+    document.documentElement.style.setProperty('--mint', state.accent + '22');
+  }
+}
+
+async function toggleReminder() {
+  if (state.reminderOn) {
+    state.reminderOn = false;
+    store.set('orbit-reminder', false);
+    toast('提醒已關閉');
+    return;
+  }
+  if (!('Notification' in window)) { toast('此瀏覽器不支援通知'); return; }
+  const perm = await Notification.requestPermission();
+  if (perm !== 'granted') { toast('需要通知權限才能提醒'); return; }
+  state.reminderOn = true;
+  store.set('orbit-reminder', true);
+  toast('每日晚間 8 點會提醒你打卡');
+  // fire one immediately as a test
+  try { new Notification('Orbit 提醒已開啟 🌱', { body: '今晚 8 點會提醒你完成今日習慣。' }); } catch {}
+}
+
+function checkReminder() {
+  if (!state.reminderOn || !('Notification' in window) || Notification.permission !== 'granted') return;
+  const h = new Date().getHours();
+  const done = todayHabits().length > 0 && todayHabits().every((hb) => isDone(hb.id, todayKey()));
+  if (h >= 20 && !done) {
+    try { new Notification('今天還差一點 ☑️', { body: '還有習慣沒完成，去打個卡吧。' }); } catch {}
+  }
+}
+
+function exportCsv() {
+  const rows = [['habit', 'date', 'completed_count']];
+  for (const l of state.logs) {
+    const h = state.habits.find((x) => x.id === l.habit_id);
+    rows.push([h ? h.name : l.habit_id, l.date, l.completed_count || 1]);
+  }
+  const csv = rows.map((r) => r.map((c) => '"' + String(c).replace(/"/g, '""') + '"').join(',')).join('\n');
+  const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'orbit-history.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  toast('CSV 已匯出');
 }
 
 /* ------------------------------------------------------------- supabase */
@@ -1655,6 +1719,28 @@ function wireEvents() {
     });
   }
 
+  // accent color picker
+  if ($('colorRow')) {
+    $('colorRow').querySelectorAll('.color-dot').forEach((b) => {
+      b.addEventListener('click', () => {
+        state.accent = b.dataset.color;
+        store.set('orbit-accent', state.accent);
+        applyAccent();
+        $('colorRow').querySelectorAll('.color-dot').forEach((x) => x.classList.toggle('on', x === b));
+      });
+    });
+  }
+
+  // reminder toggle
+  if ($('reminderBtn')) {
+    $('reminderBtn').addEventListener('click', toggleReminder);
+  }
+
+  // CSV export
+  if ($('exportCsvBtn')) {
+    $('exportCsvBtn').addEventListener('click', exportCsv);
+  }
+
   $('confirmOk').addEventListener('click', () => resolveConfirm(true));
   $('confirmCancel').addEventListener('click', () => resolveConfirm(false));
 
@@ -1719,6 +1805,9 @@ async function boot() {
   state.avatar = store.get(KEY.avatar, '');
   state.healthDone = Object.assign({ water: false, walk: false, sleep: false }, store.get(KEY.health, {}));
   state.mood = store.get('orbit-mood-' + todayKey(), '');
+  state.accent = store.get('orbit-accent', '');
+  state.reminderOn = store.get('orbit-reminder', false);
+  applyAccent();
 
   buildIconPicker();
   buildDayChips();
@@ -1747,6 +1836,7 @@ async function boot() {
   }
   await initNative();
   render();
+  checkReminder();
 
   // Offline app shell. Only registered over http(s): the native WebView loads
   // from capacitor:// or https://localhost, and file:// previews must not try.

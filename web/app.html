@@ -140,6 +140,7 @@ h2{font-size:17.5px;letter-spacing:-.4px;margin:0 0 4px}
 .tick{width:42px;height:42px;border-radius:14px;border:1.5px solid var(--line);background:var(--field);color:transparent;font-size:18px;flex-shrink:0;transition:transform .16s ease,background .18s,border-color .18s}
 .tick:active{transform:scale(.9)}
 .tick.done{background:var(--green);border-color:var(--green);color:var(--green-ink)}
+.tick-num{font-size:12px;font-weight:700}
 .habit-actions{display:grid;gap:8px;padding:10px 12px 12px;border:1px solid var(--green);border-top:1px dashed var(--line);border-radius:0 0 var(--radius-sm) var(--radius-sm);margin-top:-9px;background:var(--card)}
 .habit-actions .row{display:flex;gap:7px;flex-wrap:wrap}
 .habit-actions .btn{font-size:12.5px;padding:8px 12px;min-height:38px}
@@ -270,6 +271,12 @@ input:focus,select:focus,textarea:focus{outline:2px solid color-mix(in srgb,var(
 .lang-list button{border:1px solid var(--line);background:var(--field);border-radius:13px;padding:13px 16px;text-align:left;font-size:15px;transition:all .15s}
 .lang-list button.on{border-color:var(--green);background:var(--mint);font-weight:700;color:var(--green)}
 .lang-list button:active{transform:scale(.98)}
+
+/* ---------- color dots ---------- */
+.color-row{display:flex;gap:8px}
+.color-dot{width:26px;height:26px;border-radius:50%;border:2px solid transparent;cursor:pointer;transition:transform .12s}
+.color-dot.on{border-color:var(--ink);transform:scale(1.15)}
+.color-dot:active{transform:scale(.9)}
 
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}
@@ -458,10 +465,21 @@ input:focus,select:focus,textarea:focus{outline:2px solid color-mix(in srgb,var(
         <div class="profileline"><span id="accountStatusLabel">帳號狀態</span><b class="val" id="profileStatus">訪客模式</b></div>
         <div class="profileline"><span id="languageLabel">介面語言</span><button class="smalllink" id="langBtn2">切換語言</button></div>
         <div class="profileline"><span id="themeLabel">外觀</span><button class="smalllink" id="themeBtn2">跟隨系統</button></div>
+        <div class="profileline"><span>每日提醒</span><button class="smalllink" id="reminderBtn">開啟</button></div>
+        <div class="profileline"><span>主題色</span>
+          <div class="color-row" id="colorRow">
+            <button type="button" data-color="#315b49" style="background:#315b49" class="color-dot on" aria-label="墨綠"></button>
+            <button type="button" data-color="#4a6fa5" style="background:#4a6fa5" class="color-dot" aria-label="深藍"></button>
+            <button type="button" data-color="#8b5a8c" style="background:#8b5a8c" class="color-dot" aria-label="紫"></button>
+            <button type="button" data-color="#b85c3c" style="background:#b85c3c" class="color-dot" aria-label="磚紅"></button>
+            <button type="button" data-color="#5a7d5a" style="background:#5a7d5a" class="color-dot" aria-label="草綠"></button>
+          </div>
+        </div>
         <div class="profileline"><span id="dataLabel">資料儲存</span><b class="val" id="storageStatus">本機</b></div>
         <div class="btnrow">
           <button class="btn primary" id="profileAccountBtn">登入 / 同步</button>
-          <button class="btn" id="exportBtn">匯出資料</button>
+          <button class="btn" id="exportBtn">匯出 JSON</button>
+          <button class="btn" id="exportCsvBtn">匯出 CSV</button>
           <button class="btn" id="importBtn">匯入資料</button>
           <button class="btn hidden" id="signOutBtn">登出</button>
         </div>
