@@ -169,6 +169,14 @@ input:focus,select:focus,textarea:focus{outline:2px solid color-mix(in srgb,var(
 .bar i{display:block;width:100%;min-height:4px;background:linear-gradient(180deg,var(--green),color-mix(in srgb,var(--green) 62%,var(--mint)));border-radius:9px;transition:height .5s cubic-bezier(.2,.8,.25,1)}
 .barcol b{font-size:11px}
 .bar-emoji{font-size:16px;margin-bottom:2px}
+
+/* ---------- weather card ---------- */
+.weather-card{margin-top:18px;border-radius:20px;padding:18px 20px;display:flex;justify-content:space-between;align-items:center;color:#fff;background:linear-gradient(135deg,#6a8caf,#8cb4c9)}
+.weather-left{display:flex;align-items:center;gap:14px}
+.weather-emoji{font-size:44px;line-height:1}
+.weather-temp{font-size:28px;font-weight:800;line-height:1.1}
+.weather-desc{font-size:13px;opacity:.9}
+.weather-loc{font-size:12px;opacity:.8;text-align:right}
 .barcol span{font-size:10.5px;color:var(--muted)}
 .barcol.today b{color:var(--green)}
 
@@ -397,6 +405,19 @@ input:focus,select:focus,textarea:focus{outline:2px solid color-mix(in srgb,var(
       <div class="eyebrow" id="insightEyebrow">NOTICE YOUR GROWTH</div>
       <h1 class="sectiontitle" id="insightHeading">看見自己的進步</h1>
       <p class="sub" id="insightSub">不需要每天滿分，持續就很了不起。</p>
+
+      <!-- weather card -->
+      <section class="weather-card" id="weatherCard">
+        <div class="weather-left">
+          <div class="weather-emoji" id="weatherEmoji">⛅</div>
+          <div>
+            <div class="weather-temp" id="weatherTemp">--°</div>
+            <div class="weather-desc" id="weatherDesc">載入天氣…</div>
+          </div>
+        </div>
+        <div class="weather-loc" id="weatherLoc">—</div>
+      </section>
+
       <section class="panel" style="margin-top:18px">
         <h2 id="weekTitle">近七天的完成紀錄</h2>
         <div class="chart" id="weekChart"></div>

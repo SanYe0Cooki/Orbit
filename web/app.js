@@ -836,6 +836,57 @@ function checkReminder() {
   }
 }
 
+/* ------------------------------------------------------------- weather */
+async function loadWeather() {
+  try {
+    // 1. get location from IP
+    const ipRes = await fetch('https://ipapi.co/json/');
+    const ip = await ipRes.json();
+    const lat = ip.latitude, lon = ip.longitude, city = ip.city || '—';
+
+    // 2. get weather from Open-Meteo
+    const wxRes = await fetch(
+      'https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon +
+      '&current=temperature_2m,weather_code&timezone=auto'
+    );
+    const wx = await wxRes.json();
+    const temp = Math.round(wx.current.temperature_2m);
+    const code = wx.current.weather_code;
+
+    // 3. map code to emoji + gradient
+    const WX = {
+      0:  { e: '☀️', bg: 'linear-gradient(135deg,#f0a04b,#f5c86a)', label: '晴朗' },
+      1:  { e: '🌤️', bg: 'linear-gradient(135deg,#6a8caf,#8cb4c9)', label: '大致晴朗' },
+      2:  { e: '⛅', bg: 'linear-gradient(135deg,#7a8a9a,#9aabba)', label: '多雲' },
+      3:  { e: '☁️', bg: 'linear-gradient(135deg,#6a7078,#8a9098)', label: '陰天' },
+      45: { e: '🌫️', bg: 'linear-gradient(135deg,#8a8a8a,#aaaaaa)', label: '霧' },
+      48: { e: '🌫️', bg: 'linear-gradient(135deg,#8a8a8a,#aaaaaa)', label: '霧' },
+      51: { e: '🌦️', bg: 'linear-gradient(135deg,#5a7a9a,#7a9ab8)', label: '小毛毛雨' },
+      53: { e: '🌦️', bg: 'linear-gradient(135deg,#5a7a9a,#7a9ab8)', label: '毛毛雨' },
+      55: { e: '🌧️', bg: 'linear-gradient(135deg,#4a6a8a,#6a8aaa)', label: '濃毛毛雨' },
+      61: { e: '🌧️', bg: 'linear-gradient(135deg,#3a5a7a,#5a7a9a)', label: '小雨' },
+      63: { e: '🌧️', bg: 'linear-gradient(135deg,#3a5a7a,#5a7a9a)', label: '中雨' },
+      65: { e: '⛈️', bg: 'linear-gradient(135deg,#2a4a6a,#4a6a8a)', label: '大雨' },
+      71: { e: '🌨️', bg: 'linear-gradient(135deg,#8aaac8,#b0cde0)', label: '小雪' },
+      73: { e: '🌨️', bg: 'linear-gradient(135deg,#8aaac8,#b0cde0)', label: '中雪' },
+      75: { e: '❄️', bg: 'linear-gradient(135deg,#aac4dd,#cdddee)', label: '大雪' },
+      80: { e: '🌦️', bg: 'linear-gradient(135deg,#5a7a9a,#7a9ab8)', label: '陣雨' },
+      81: { e: '🌧️', bg: 'linear-gradient(135deg,#3a5a7a,#5a7a9a)', label: '強陣雨' },
+      82: { e: '⛈️', bg: 'linear-gradient(135deg,#2a4a6a,#4a6a8a)', label: '暴雨' },
+      95: { e: '⛈️', bg: 'linear-gradient(135deg,#2a3a5a,#4a5a7a)', label: '雷雨' }
+    };
+    const w = WX[code] || WX[2];
+
+    $('weatherEmoji').textContent = w.e;
+    $('weatherTemp').textContent = temp + '°';
+    $('weatherDesc').textContent = w.label;
+    $('weatherLoc').textContent = city;
+    $('weatherCard').style.background = w.bg;
+  } catch (e) {
+    $('weatherDesc').textContent = '無法取得天氣';
+  }
+}
+
 function exportCsv() {
   const rows = [['habit', 'date', 'completed_count']];
   for (const l of state.logs) {
@@ -1860,6 +1911,7 @@ async function boot() {
   await initNative();
   render();
   checkReminder();
+  loadWeather();
 
   // Offline app shell. Only registered over http(s): the native WebView loads
   // from capacitor:// or https://localhost, and file:// previews must not try.
