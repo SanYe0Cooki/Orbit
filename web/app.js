@@ -128,10 +128,10 @@ const DICT = {
     schedule: '重複的日子', daily: '每天', target: '一天幾次', save: '儲存習慣', saveEdit: '儲存變更',
     authTitle: '登入 Orbit', authDesc: '用電子郵件註冊或登入，習慣就會在手機與電腦之間同步。',
     email: '電子郵件', password: '密碼', passwordHint: '至少 6 個字元',
-    authSubmit: '登入 / 建立帳號', authSubmitSignup: '建立帳號', authSubmitLogin: '登入',
+    authSubmit: '登入 / 建立帳號', authSubmitSignup: '登入 / 建立帳號', authSubmitLogin: '登入 / 建立帳號',
     authMode: '還沒有帳號？建立帳號',
-    authModeBack: '已經有帳號？登入', authNotice: '若需驗證電子郵件，請查看你的收件匣（包含垃圾郵件）。',
-    authNoticeSignup: '輸入電子郵件與密碼就能建立帳號。',
+    authModeBack: '已經有帳號？登入', authNotice: '輸入電子郵件與密碼：第一次使用會自動建立帳號，之後就是登入。',
+    authNoticeSignup: '輸入電子郵件與密碼：第一次使用會自動建立帳號，之後就是登入。',
     forgot: '忘記密碼', resetTitle: '重設密碼',
     resetDesc: '輸入註冊用的電子郵件，我們會寄送重設連結給你。',
     resetEmail: '電子郵件', resetSubmit: '寄送重設連結', newPassTitle: '設定新密碼',
@@ -199,10 +199,10 @@ const DICT = {
     schedule: 'Repeat on', daily: 'Every day', target: 'Times per day', save: 'Save habit', saveEdit: 'Save changes',
     authTitle: 'Sign in to Orbit', authDesc: 'Register or sign in with your email to sync across devices.',
     email: 'Email address', password: 'Password', passwordHint: 'At least 6 characters',
-    authSubmit: 'Sign in / Create account', authSubmitSignup: 'Create account', authSubmitLogin: 'Sign in',
+    authSubmit: 'Sign in / Create account', authSubmitSignup: 'Sign in / Create account', authSubmitLogin: 'Sign in / Create account',
     authMode: 'New here? Create an account',
-    authModeBack: 'Already have an account? Sign in', authNotice: 'If email confirmation is required, check your inbox (and spam).',
-    authNoticeSignup: 'Enter an email and a password to create your account.',
+    authModeBack: 'Already have an account? Sign in', authNotice: 'Enter an email and a password: the first time creates the account, after that it signs you in.',
+    authNoticeSignup: 'Enter an email and a password: the first time creates the account, after that it signs you in.',
     forgot: 'Forgot password', resetTitle: 'Reset password',
     resetDesc: 'Enter the email you registered with and we will send a reset link.',
     resetEmail: 'Email address', resetSubmit: 'Send reset link', newPassTitle: 'Set a new password',
@@ -540,9 +540,9 @@ function applyStrings() {
     habitDescLabel: 'habitDesc', scheduleLabel: 'schedule', targetLabel: 'target',
     saveHabitBtn: state.editingId ? 'saveEdit' : 'save',
     authTitle: 'authTitle', authDesc: 'authDesc', emailLabel: 'email', passwordLabel: 'password',
-    passwordHint: 'passwordHint', authModeBtn: state.authMode === 'login' ? 'authMode' : 'authModeBack',
-    authSubmit: state.authMode === 'signup' ? 'authSubmitSignup' : 'authSubmitLogin',
-    authNotice: state.authMode === 'signup' ? 'authNoticeSignup' : 'authNotice', forgotBtn: 'forgot',
+    passwordHint: 'passwordHint',
+    authSubmit: 'authSubmit',
+    authNotice: 'authNotice', forgotBtn: 'forgot',
     resetTitle: 'resetTitle', resetDesc: 'resetDesc', resetEmailLabel: 'resetEmail', resetSubmit: 'resetSubmit',
     newPassTitle: 'newPassTitle', newPassDesc: 'newPassDesc', newPassLabel: 'newPass', newPassSubmit: 'newPassSubmit',
     filterActive: 'filterActive', filterPaused: 'filterPaused', filterArchived: 'filterArchived', filterAll: 'filterAll',
@@ -926,6 +926,15 @@ function showEmailConfirmationHelp(email) {
   console.warn('[orbit] email confirmation is enabled on the Supabase project for ' + email);
 }
 
+/**
+ * One action for both cases: sign in if the account exists, otherwise create it.
+ *
+ * The user never has to choose "register" or "sign in". This only works without
+ * any email round-trip when the Supabase project has "Confirm email" turned off
+ * (Authentication → Sign In / Providers → Email); the toggle lives on the server
+ * and cannot be changed from here, so when it is still on we say exactly that
+ * instead of showing a raw English error.
+ */
 async function submitAuth(event) {
   event.preventDefault();
   if (state.busy || !state.supabase) { if (!state.supabase) authError(t('netError')); return; }
@@ -937,49 +946,59 @@ async function submitAuth(event) {
 
   spinner(true);
   $('authSubmit').disabled = true;
+  const sb = state.supabase;
+
+  const succeed = async (session, isNew) => {
+    await adoptSession(session);
+    hideModal('authModal');
+    toast(isNew ? t('accountReady') : t('welcome'));
+  };
+
   try {
-    const sb = state.supabase;
-    if (state.authMode === 'signup') {
-      const res = await sb.auth.signUp({
-        email,
-        password,
-        options: { emailRedirectTo: redirectUrl(), data: { locale: state.lang } }
-      });
-      if (res.error) throw res.error;
-
-      // Confirmation disabled: signUp already returns a session, so the user is
-      // registered and signed in with no email involved.
-      if (res.data && res.data.session) {
-        await adoptSession(res.data.session);
-        hideModal('authModal');
-        toast(t('accountReady'));
-        return;
-      }
-
-      // No session came back. Either confirmation is enabled, or the address is
-      // already registered (Supabase hides which, on purpose). Try to sign in
-      // straight away: that succeeds when confirmation is off, and gives a
-      // precise "Email not confirmed" error when it is on.
-      const signIn = await sb.auth.signInWithPassword({ email, password });
-      if (!signIn.error && signIn.data && signIn.data.session) {
-        await adoptSession(signIn.data.session);
-        hideModal('authModal');
-        toast(t('accountReady'));
-        return;
-      }
-      if (signIn.error && /not confirmed/i.test(signIn.error.message || '')) {
-        showEmailConfirmationHelp(email);
-        return;
-      }
-      // Already registered with a different password, or confirmation pending.
-      authError(signIn.error ? friendlyError(signIn.error) : t('confirmPending'));
-    } else {
-      const res = await sb.auth.signInWithPassword({ email, password });
-      if (res.error) throw res.error;
-      await adoptSession(res.data.session);
-      hideModal('authModal');
-      toast(t('welcome'));
+    // 1. Existing account with this exact password.
+    const signIn = await sb.auth.signInWithPassword({ email, password });
+    if (!signIn.error && signIn.data && signIn.data.session) {
+      await succeed(signIn.data.session, false);
+      return;
     }
+    if (signIn.error && /not confirmed/i.test(signIn.error.message || '')) {
+      showEmailConfirmationHelp(email);
+      return;
+    }
+
+    // 2. No such account yet (or the password did not match): try to create it.
+    const signUp = await sb.auth.signUp({
+      email,
+      password,
+      options: { emailRedirectTo: redirectUrl(), data: { locale: state.lang } }
+    });
+
+    if (signUp.error) {
+      // Typically "User already registered" — meaning step 1 failed on the
+      // password, not because the account is missing.
+      authError(/already/i.test(signUp.error.message || '') ? t('badLogin') : friendlyError(signUp.error));
+      return;
+    }
+
+    // Confirmation off: sign-up already returned a session, no email involved.
+    if (signUp.data && signUp.data.session) {
+      await succeed(signUp.data.session, true);
+      return;
+    }
+
+    // No session: confirmation is still enabled on the project, OR the address
+    // was already registered (Supabase hides which, on purpose). One more sign-in
+    // tells us which, and succeeds as soon as confirmation is off.
+    const retry = await sb.auth.signInWithPassword({ email, password });
+    if (!retry.error && retry.data && retry.data.session) {
+      await succeed(retry.data.session, false);
+      return;
+    }
+    if (retry.error && /not confirmed/i.test(retry.error.message || '')) {
+      showEmailConfirmationHelp(email);
+      return;
+    }
+    authError(t('confirmPending'));
   } catch (error) {
     if (/not confirmed/i.test((error && error.message) || '')) {
       showEmailConfirmationHelp(email);
@@ -1324,12 +1343,16 @@ function wireEvents() {
   $('accountBtn').addEventListener('click', () => { if (state.session) switchView('profile'); else showModal('authModal'); });
   $('profileAccountBtn').addEventListener('click', () => { if (state.session) signOut(); else showModal('authModal'); });
   $('authForm').addEventListener('submit', submitAuth);
-  $('authModeBtn').addEventListener('click', () => {
-    state.authMode = state.authMode === 'login' ? 'signup' : 'login';
-    $('password').setAttribute('autocomplete', state.authMode === 'signup' ? 'new-password' : 'current-password');
-    authError('');
-    applyStrings();
-  });
+  // Signing in and creating an account are the same action now, so the mode
+  // switch is no longer offered. Kept tolerant of the element being absent.
+  if ($('authModeBtn')) {
+    $('authModeBtn').addEventListener('click', () => {
+      state.authMode = state.authMode === 'login' ? 'signup' : 'login';
+      $('password').setAttribute('autocomplete', state.authMode === 'signup' ? 'new-password' : 'current-password');
+      authError('');
+      applyStrings();
+    });
+  }
   $('forgotBtn').addEventListener('click', () => {
     hideModal('authModal');
     $('resetEmail').value = $('email').value.trim();

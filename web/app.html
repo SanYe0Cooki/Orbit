@@ -400,7 +400,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid color-mix(in srgb,var(
     <div class="grab"></div>
     <button class="x" data-close="authModal" aria-label="關閉">×</button>
     <h2 id="authTitle">登入 Orbit</h2>
-    <p id="authDesc">用電子郵件註冊或登入，習慣就會在手機與電腦之間同步。</p>
+    <p id="authDesc">輸入電子郵件與密碼即可，第一次使用會自動建立帳號。</p>
     <form id="authForm" autocomplete="on">
       <div class="field">
         <label id="emailLabel" for="email">電子郵件</label>
@@ -414,9 +414,10 @@ input:focus,select:focus,textarea:focus{outline:2px solid color-mix(in srgb,var(
       <div class="err" id="authErr"></div>
       <button class="btn primary" type="submit" id="authSubmit">登入 / 建立帳號</button>
     </form>
-    <button class="smalllink" id="authModeBtn">還沒有帳號？建立帳號</button>
+    <!-- Signing in and creating an account are one action, so no mode switch. -->
+    <button class="smalllink hidden" id="authModeBtn" hidden aria-hidden="true">還沒有帳號？建立帳號</button>
     <button class="smalllink" id="forgotBtn">忘記密碼</button>
-    <div class="notice" id="authNotice">若需驗證電子郵件，請查看你的收件匣（包含垃圾郵件）。</div>
+    <div class="notice" id="authNotice">輸入電子郵件與密碼：第一次使用會自動建立帳號，之後就是登入。</div>
   </div>
 </div>
 
